@@ -1,62 +1,57 @@
-// src/contexts/useAuth.js
+import { createContext, useContext, useEffect, useState } from 'react'
+import { login, is_authenticated, register, logout as apiLogout } from '../endpoints/api'
+import { useNavigate } from 'react-router-dom'
 
-import { createContext, useContext, useEffect, useState } from 'react';
-import { login, is_authenticated, register } from '../endpoints/api';
-import { useNavigate } from 'react-router-dom';
-
-const AuthContext = createContext();
+const AuthContext = createContext()
 
 export const AuthProvider = ({ children }) => {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [loading, setLoading]                 = useState(true);
-  const nav                                   = useNavigate();
+  const [isAuthenticated, setIsAuthenticated] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const [user, setUser] = useState(null)
+  const nav = useNavigate()
 
-  // Verifica si el usuario ya estaba autenticado
   const get_authenticated = async () => {
     try {
-      const success = await is_authenticated();
-      setIsAuthenticated(success);
+      const success = await is_authenticated()
+      setIsAuthenticated(success)
     } catch {
-      setIsAuthenticated(false);
+      setIsAuthenticated(false)
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
-  };
+  }
 
-  // Login tradicional
   const login_user = async (username, password) => {
-    const success = await login(username, password);
+    const success = await login(username, password)
     if (success) {
-      setIsAuthenticated(true);
-      nav('/');
+      setIsAuthenticated(true)
+      setUser(username)
+      nav('/')
     }
-  };
+  }
 
-  // Registro de nuevo usuario
+  const logout_user = async () => {
+    await apiLogout()
+    setIsAuthenticated(false)
+    setUser(null)
+    nav('/login')
+  }
+
   const register_user = async (username, email, password, confirmPassword) => {
-    if (password !== confirmPassword) {
-      alert('Las contraseñas no coinciden');
-      return;
-    }
-    try {
-      await register(username, email, password);
-      alert('Usuario registrado con éxito');
-      // ← Redirige aquí, justo después de registrarse
-      nav('/login');
-    } catch {
-      alert('Error al registrar el usuario');
-    }
-  };
+    if (password !== confirmPassword) return
+    await register(username, email, password)
+    nav('/login')
+  }
 
   useEffect(() => {
-    get_authenticated();
-  }, [window.location.pathname]);
+    get_authenticated()
+  }, [window.location.pathname])
 
   return (
-    <AuthContext.Provider value={{ isAuthenticated, loading, login_user, register_user }}>
+    <AuthContext.Provider value={{ isAuthenticated, loading, user, login_user, logout_user, register_user }}>
       {children}
     </AuthContext.Provider>
-  );
-};
+  )
+}
 
-export const useAuth = () => useContext(AuthContext);
+export const useAuth = () => useContext(AuthContext)
