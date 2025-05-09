@@ -1,102 +1,147 @@
+// src/routes/ContractForm.jsx
+import { useState } from "react";
 import {
-    Box, VStack, FormControl, FormLabel,
-    Input, Button, Spinner
-  } from "@chakra-ui/react";
-  import { useState, useEffect } from "react";
-  import { useNavigate, useParams } from "react-router-dom";
-  import {
-    get_contracts,
-    create_contract,
-    update_contract
-  } from "../endpoints/api";
-  
-  export default function ContractForm() {
-    const { id } = useParams();
-    const nav = useNavigate();
-    const [form, setForm] = useState({
+  Box,
+  Heading,
+  Input,
+  Button,
+  Alert,
+  AlertIcon,
+  AlertTitle,
+  AlertDescription,
+} from "@chakra-ui/react";
+import { useNavigate } from "react-router-dom";
+import { create_contract, update_contract } from "../endpoints/api";
+
+const fieldLabels = {
+  contract_name: "Nombre",
+  client_name:   "Cliente",
+  start_date:    "Fecha Inicio",
+  end_date:      "Fecha Fin",
+};
+
+export default function ContractForm({ existing }) {
+  const nav = useNavigate();
+  const [form, setForm] = useState(
+    existing || {
       contract_name: "",
-      client_name: "",
-      start_date: "",
-      end_date: ""
-    });
-    const [loading, setLoading] = useState(!!id);
-  
-    useEffect(() => {
-      if (!id) return;
-      (async () => {
-        const data = await get_contracts();
-        const c = data.find((x) => x.id === +id);
-        setForm({
-          contract_name: c.contract_name,
-          client_name: c.client_name,
-          start_date: c.start_date,
-          end_date: c.end_date
-        });
-        setLoading(false);
-      })();
-    }, [id]);
-  
-    if (loading) return <Spinner color="teal" />;
-  
-    const onChange = (e) => {
-      setForm({ ...form, [e.target.name]: e.target.value });
-    };
-  
-    const onSubmit = async () => {
-      if (id) {
-        await update_contract(id, form);
+      client_name:   "",
+      start_date:    "",
+      end_date:      "",
+    }
+  );
+  const [errors, setErrors] = useState({});
+
+  const onChange = (e) => {
+    setForm({ ...form, [e.target.name]: e.target.value });
+    setErrors({});
+  };
+
+  const onSubmit = async () => {
+    try {
+      if (existing) {
+        await update_contract(existing.id, form);
       } else {
         await create_contract(form);
       }
+      // Aquí redirigimos a la ruta raíz donde muestras la lista de contratos
       nav("/");
-    };
-  
-    return (
-      <Box maxW="500px" mx="auto" mt={8} bg="gray.700" p={6} rounded="md">
-        <VStack spacing={4} align="stretch">
-          <FormControl>
-            <FormLabel color="gray.300">Nombre</FormLabel>
-            <Input
-              name="contract_name"
-              value={form.contract_name}
-              onChange={onChange}
-              color="white"
-            />
-          </FormControl>
-          <FormControl>
-            <FormLabel color="gray.300">Cliente</FormLabel>
-            <Input
-              name="client_name"
-              value={form.client_name}
-              onChange={onChange}
-              color="white"
-            />
-          </FormControl>
-          <FormControl>
-            <FormLabel color="gray.300">Fecha Inicio</FormLabel>
-            <Input
-              name="start_date"
-              type="date"
-              value={form.start_date}
-              onChange={onChange}
-              color="white"
-            />
-          </FormControl>
-          <FormControl>
-            <FormLabel color="gray.300">Fecha Fin</FormLabel>
-            <Input
-              name="end_date"
-              type="date"
-              value={form.end_date}
-              onChange={onChange}
-              color="white"
-            />
-          </FormControl>
-          <Button colorScheme="teal" onClick={onSubmit}>
-            {id ? "Actualizar" : "Crear"}
-          </Button>
-        </VStack>
+    } catch (err) {
+      if (err.response?.status === 400) {
+        const data = { ...err.response.data };
+        if (data.contract_name) {
+          data.contract_name = ["Ya existe un contrato con ese nombre."];
+        }
+        if (data.end_date) {
+          data.end_date = [data.end_date];
+        }
+        setErrors(data);
+      }
+    }
+  };
+
+  return (
+    <Box maxW="400px" mx="auto" mt={8} p={6} bg="gray.700" rounded="md">
+      <Heading size="md" mb={4}>
+        {existing ? "Editar Contrato" : "Nuevo Contrato"}
+      </Heading>
+
+      {Object.keys(errors).length > 0 && (
+        <Alert status="error" variant="solid" mb={4} rounded="md">
+          <AlertIcon />
+          <Box>
+            <AlertTitle mb={2}>Corrige los siguientes errores:</AlertTitle>
+            {Object.entries(errors).map(([field, msgs]) => (
+              <AlertDescription key={field} display="block">
+                <strong>{fieldLabels[field] || field}:</strong>{" "}
+                {Array.isArray(msgs) ? msgs.join(" ") : msgs}
+              </AlertDescription>
+            ))}
+          </Box>
+        </Alert>
+      )}
+
+      <Box mb={3}>
+        <Heading size="sm" color="gray.300">
+          Nombre
+        </Heading>
+        <Input
+          name="contract_name"
+          value={form.contract_name}
+          onChange={onChange}
+          bg="gray.800"
+          borderColor="gray.600"
+          color="white"
+        />
       </Box>
-    );
-  }
-  
+
+      <Box mb={3}>
+        <Heading size="sm" color="gray.300">
+          Cliente
+        </Heading>
+        <Input
+          name="client_name"
+          value={form.client_name}
+          onChange={onChange}
+          bg="gray.800"
+          borderColor="gray.600"
+          color="white"
+        />
+      </Box>
+
+      <Box mb={3}>
+        <Heading size="sm" color="gray.300">
+          Fecha Inicio
+        </Heading>
+        <Input
+          type="date"
+          name="start_date"
+          value={form.start_date}
+          onChange={onChange}
+          bg="gray.800"
+          borderColor="gray.600"
+          color="white"
+        />
+      </Box>
+
+      <Box mb={6}>
+        <Heading size="sm" color="gray.300">
+          Fecha Fin
+        </Heading>
+        <Input
+          type="date"
+          name="end_date"
+          value={form.end_date}
+          onChange={onChange}
+          bg="gray.800"
+          borderColor="gray.600"
+          color="white"
+        />
+      </Box>
+
+      <Button colorScheme="teal" w="full" onClick={onSubmit}>
+        {existing ? "Actualizar" : "Crear"}
+      </Button>
+    </Box>
+  );
+}
