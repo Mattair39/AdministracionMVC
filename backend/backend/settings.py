@@ -12,7 +12,7 @@ DEBUG = os.environ.get("DEBUG", "True") == "True"
 
 ALLOWED_HOSTS = os.environ.get(
     "ALLOWED_HOSTS",
-    "localhost,127.0.0.1"
+    "localhost,127.0.0.1,administracionmvc-hpfl.onrender.com"
 ).split(",")
 
 INSTALLED_APPS = [
@@ -80,7 +80,7 @@ USE_TZ = True
 
 CORS_ALLOWED_ORIGINS = os.environ.get(
     "CORS_ALLOWED_ORIGINS",
-    "http://localhost:3000"
+    "http://localhost:3000,https://administracionmvc-static.onrender.com"
 ).split(",")
 CORS_ALLOW_CREDENTIALS = True
 
