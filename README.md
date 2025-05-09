@@ -1,50 +1,43 @@
-# MVC Login (React - Django)
+# MVC Administración – Gestión de Contratos y Proyectos
 
-Aplicación de autenticación segura y gestión de recursos (notas) desarrollada bajo el patrón **MVC** con **Django** en el backend y **React** en el frontend.
-
-La autenticación se basa en **JWT** (JSON Web Tokens) almacenados en **cookies _httponly_** para maximizar la seguridad, y el frontend aprovecha rutas privadas que sólo permiten el acceso una vez validado el token.
+Aplicación web con **autenticación JWT** (almacenado en cookies _HttpOnly_) y CRUD relacionado de **Contratos** y **Proyectos**, desarrollada bajo el patrón **MVC** con **Django + Django REST Framework** en el backend y **React + Chakra UI** en el frontend. Contempla la administración del sistema mediante la aplicación de validaciones para elementos sensibles del Core y relaciona los elementos de las tablas de manera orgánica y lo muestra mediante dropdowns y Tabs relacionados.
 
 ---
 
 ## Descripción del Proyecto
 
-Este proyecto demuestra el desarrollo de una aplicacion web para inicio de sesiones y control de acceso:
+1. **Autenticación segura**  
+   - Emisión de _access_ y _refresh tokens_ con **SimpleJWT**.  
+   - Los tokens se guardan en cookies _HttpOnly_ (`samesite=None, secure`) para mitigar XSS.  
+   - Endpoint `/authenticated/` que verifica la validez del token en cookie.
 
-1. **Backend en Django + Django REST Framework**  
-   - Endpoints RESTful que emiten y refrescan tokens _access_ y _refresh_ mediante **SimpleJWT**.  
-   - Los tokens se devuelven al cliente y se guardan en _cookies_ seguras (`httponly`, `samesite=None`), evitando el acceso por JavaScript y mitigando XSS.  
-   - Un endpoint que valida la autenticación leyendo el token desde la cookie, devolviendo 200 OK si el usuario está logueado.
+2. **Gestión de Contratos**  
+   - CRUD completo de contratos: `contract_name`, `client_name`, `start_date`, `end_date`.  
+   - **Validación en back-end**:  
+     - ❗️ `end_date ≥ start_date` (no puede grabar un contrato con fecha de fin anterior).  
+     - 🚨 `contract_name` debe ser **único** por usuario (se valida en el serializer).  
 
-2. **Frontend en React + Chakra UI + Axios**  
-   - Formularios de **Registro** y **Login** que llaman a la API y, tras éxito, redirigen según el flujo (registro → login, login → menú).  
-   - Gestión de estado de autenticación vía un `AuthContext` que encapsula:
-     - Llamadas a `/token/`, `/token/refresh/` y `/authenticated/` con `withCredentials: true`.  
-     - Lógica para refrescar el token automáticamente al expirar.  
-     - Funciones `login_user`, `register_user` y `logout` que navegan entre rutas (`/login`, `/register`, `/`) usando **React Router v6**.
+3. **Gestión de Proyectos**  
+   - CRUD completo de proyectos: `name`, `description`, `contract_id`.  
+   - **Relación FK**: Al crear/editar un proyecto no se escribe manualmente la clave foránea, sino que el frontend muestra un **dropdown** con todos los contratos, forzando la selección de un contrato existente.  
+   - **Validación en back-end**:  
+     - ❗️ `name` debe ser **único** dentro de cada contrato.
 
-3. **Rutas Privadas**  
-   - Componente `PrivateRoute` que bloquea el acceso al menú principal si no hay un JWT válido.  
-   - Muestra un spinner o mensaje de “Loading…” mientras determina el estado de autenticación.
+4. **Frontend desacoplado**  
+   - React con `AuthContext` para encapsular login, logout, registro y refresco automático de tokens.  
+   - Rutas privadas con React Router v6 que bloquean componentes hasta tener un JWT válido.
 
-4. **CRUD de Recursos**  
-   - Ejemplo de manejo de datos: un listado de “notas” (o libros), obtenidas con `axios.get('/api/notes/')`.  
-   - El usuario puede ver sus notas, y en versiones posteriores podría ampliarse a crear, editar y eliminar (model `Book`) sin tocar la lógica de autenticación.
-
-Gracias a este enfoque, la aplicación logra:
-
-- Un flujo de **autenticación completamente desacoplado**: el backend sólo se preocupa de emitir y validar tokens, y el frontend de almacenarlos y enviarlos en cada petición.  
-- **Mayor seguridad** al no exponer el token a JavaScript (cookie `httponly`).  
-- **Escalabilidad**: cualquier otro recurso (p. ej. `Book`) puede integrarse reutilizando el mismo middleware de autenticación y el `AuthContext`.
 ---
 
 ## Tabla de Contenidos
 
 1. [Instalación](#instalación)  
-2. [Uso del Proyecto](#uso-del-proyecto)  
-3. [Características](#características)  
-4. [Contribución](#contribución)  
-5. [Créditos](#créditos)  
-6. [Licencia](#licencia)
+2. [Uso](#uso)  
+3. [Validaciones Backend](#validaciones-backend)  
+4. [Dropdown de Relación](#dropdown-de-relación)  
+5. [Características](#características)  
+6. [Contribuir](#contribuir)  
+7. [Licencia](#licencia)
 
 ---
 
@@ -65,7 +58,7 @@ La base de datos SQLite se utiliza por defecto y no requiere de configuraciones 
 
 1. Clonar el siguiente repositorio:
    ```bash
-   git clone https://github.com/Mattair39/Proyecto-Login-MVC-DJANGO-REACT.git
+   git clone https://github.com/Mattair39/Proyecto-Login-MVC-DJANGO-REACT.git](https://github.com/Mattair39/AdministracionMVC.git
    ```
 2. Ubicarse en la carpeta principal del proyecto:
    ```bash
@@ -142,32 +135,60 @@ El servidor estará disponible en **http://127.0.0.1:8000/**
    ```
 2. La aplicación de React estará disponible en **http://localhost:3000**
 
+#### Deployment Render
+
+El sitio también se encuentra deployado en: **https://administracionmvc-static.onrender.com**
+
 ---
 
 ## Uso del Proyecto
 
 **1. Registro:**
 
-Genera una nueva cuenta mediante el ingreso de un **usuario**, **correo**, **contraseña** y **confirmación**.
+**/register** → nombre de usuario, correo, contraseña y confirmación.
 
 **2. Login:**
 
 Ingresa a la aplicación mediante el ingreso de tu **usuario** y **contraseña**.
 
-**3. Visualización de Notas:**
+**3. CRUD Contratos:**
 
-Visualiza las notas y el contenido generado en la aplicación desde la interfaz protegida.
+Listado, creación, edición, eliminación de Contratos, además de contar con un Tab donde se permite ver todos los proyectos asociados al contrato y editarlos desde esta instancia.
+
+**4. CRUD Proyectos:**
+
+Listado **(filtrado por contrato)**, creación, edición, eliminación.
+
+**Validaciones Backend**
+
+*Email de usuario*
+
+-Se valida en el serializer de registro que no exista otro usuario con el mismo email.
+
+Responde con HTTP 400 si el email ya está en uso.
+
+*Fecha de contrato*
+
+-end_date no puede ser anterior a start_date.
+
+*Unicidad de nombres*
+
+-contract_name único por usuario.
+
+-project.name único por contrato.
+
+**Todas estas validaciones ocurren en el servidor, antes de persistir en la base de datos.**
 
 ---
 
 ## Características
 
-- 🛡️ **JWT Authentication** con cookies _httponly_  
-- 🔒 **Rutas privadas** en React que bloquean contenido sin login  
-- ⚛️ **Frontend** con React + Chakra UI  
-- 🌐 **Backend** con Django REST Framework + SimpleJWT  
-- 📦 **Refresco automático** de token cuando expira  
-- 📋 **Visualización Básica de Notas** asociadas al usuario
+- 🔐 **JWT + Cookies HttpOnly**
+- 🔄 **Refresco automático de tokens**
+- 🚧 **Rutas privadas** en React
+- 📅 **Validación** de rango de fechas en Django
+- 📋 **Unicidad de nombres** de contratos y proyectos
+- 📑 **Relación** Contrato → Proyecto mediante dropdown
     
 ---
 
