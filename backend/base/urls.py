@@ -1,21 +1,26 @@
 from django.urls import path
 from .views import (
-    CustomTokenObtainPairView, CustomRefreshTokenView,
-    logout, is_authenticated, register,
-    ContractListCreateAPIView, ContractRetrieveUpdateDestroyAPIView,
-    ProjectListCreateAPIView, ProjectRetrieveUpdateDestroyAPIView,
+    CustomTokenObtainPairView,
+    CustomRefreshTokenView,
+    logout,
+    is_authenticated,
+    register,
+    ContractListCreateAPIView,
+    ContractRetrieveUpdateDestroyAPIView,
+    ProjectListCreateAPIView,
+    ProjectRetrieveUpdateDestroyAPIView,
 )
 
 urlpatterns = [
-    path('token/',         CustomTokenObtainPairView.as_view(),          name='token_obtain_pair'),
-    path('token/refresh/', CustomRefreshTokenView.as_view(),             name='token_refresh'),
-    path('logout/',        logout,                                        name='logout'),
-    path('authenticated/', is_authenticated,                              name='is_authenticated'),
-    path('register/',      register,                                      name='register'),
+    path("token/",         CustomTokenObtainPairView.as_view(),         name="token_obtain_pair"),
+    path("token/refresh/", CustomRefreshTokenView.as_view(),            name="token_refresh"),
+    path("logout/",        logout,                                      name="logout"),
+    path("authenticated/", is_authenticated,                            name="is_authenticated"),
+    path("register/",      register,                                    name="register"),
 
-    path('contracts/',     ContractListCreateAPIView.as_view(),           name='contract-list'),
-    path('contracts/<int:pk>/', ContractRetrieveUpdateDestroyAPIView.as_view(), name='contract-detail'),
+    path("contracts/",          ContractListCreateAPIView.as_view(),           name="contract-list"),
+    path("contracts/<int:pk>/", ContractRetrieveUpdateDestroyAPIView.as_view(), name="contract-detail"),
 
-    path('projects/',      ProjectListCreateAPIView.as_view(),            name='project-list'),
-    path('projects/<int:pk>/', ProjectRetrieveUpdateDestroyAPIView.as_view(), name='project-detail'),
+    path("projects/",          ProjectListCreateAPIView.as_view(),            name="project-list"),
+    path("projects/<int:pk>/", ProjectRetrieveUpdateDestroyAPIView.as_view(),  name="project-detail"),
 ]

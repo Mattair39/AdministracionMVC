@@ -13,6 +13,7 @@ import Login from "./routes/login";
 import Register from "./routes/register";
 import ContractsList from "./routes/contractsList";
 import ContractForm from "./routes/contractForm";
+import ContractDetail from "./routes/contractDetail";
 import ProjectsList from "./routes/projectsList";
 import ProjectForm from "./routes/projectForm";
 
@@ -67,7 +68,7 @@ export default function App() {
                 path="/contracts/:id"
                 element={
                   <PrivateRoute>
-                    <ContractForm />
+                    <ContractDetail />
                   </PrivateRoute>
                 }
               />

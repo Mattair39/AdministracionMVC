@@ -4,10 +4,10 @@ const BASE_URL      = "http://localhost:8000/api/";
 const LOGIN_URL     = `${BASE_URL}token/`;
 const REFRESH_URL   = `${BASE_URL}token/refresh/`;
 const CONTRACTS_URL = `${BASE_URL}contracts/`;
+const PROJECTS_URL  = `${BASE_URL}projects/`;
 const LOGOUT_URL    = `${BASE_URL}logout/`;
 const AUTH_URL      = `${BASE_URL}authenticated/`;
 const REGISTER_URL  = `${BASE_URL}register/`;
-const PROJECTS_URL  = `${BASE_URL}projects/`;
 
 const call_refresh = async (error, fn) => {
   if (error.response?.status === 401) {
@@ -73,6 +73,11 @@ export const get_contracts = async () => {
   }
 };
 
+export const get_contract = async (id) => {
+  const { data } = await axios.get(`${CONTRACTS_URL}${id}/`, { withCredentials: true });
+  return data;
+};
+
 export const create_contract = async (contract) => {
   const { data } = await axios.post(CONTRACTS_URL, contract, {
     withCredentials: true,
@@ -94,13 +99,16 @@ export const delete_contract = async (id) => {
   return true;
 };
 
-export const get_projects = async () => {
+export const get_projects = async (contractId) => {
   try {
-    const { data } = await axios.get(PROJECTS_URL, { withCredentials: true });
+    const { data } = await axios.get(
+      `${PROJECTS_URL}?contract=${contractId}`,
+      { withCredentials: true }
+    );
     return data;
   } catch (e) {
     return call_refresh(e, () =>
-      axios.get(PROJECTS_URL, { withCredentials: true })
+      axios.get(`${PROJECTS_URL}?contract=${contractId}`, { withCredentials: true })
     );
   }
 };
@@ -120,8 +128,6 @@ export const update_project = async (id, project) => {
 };
 
 export const delete_project = async (id) => {
-  await axios.delete(`${PROJECTS_URL}${id}/`, {
-    withCredentials: true,
-  });
+  await axios.delete(`${PROJECTS_URL}${id}/`, { withCredentials: true });
   return true;
 };
