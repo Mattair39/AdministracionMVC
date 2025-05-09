@@ -1,19 +1,19 @@
-from pathlib import Path
 import os
+from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-# Produce el SECRET_KEY desde una variable de entorno, o usa tu llave por defecto
 SECRET_KEY = os.environ.get(
     "SECRET_KEY",
     "django-insecure-d1dn62^iwt9orl%=*qrp*7fc&1-(q)5xi$lzu8ytqr+u*iu)8$"
 )
 
-# DEBUG lo controlas por variable, en Render lo pones a "False"
 DEBUG = os.environ.get("DEBUG", "True") == "True"
 
-# Allowed hosts desde variable, separadas por comas
-ALLOWED_HOSTS = os.environ.get("ALLOWED_HOSTS", "").split(",")
+ALLOWED_HOSTS = os.environ.get(
+    "ALLOWED_HOSTS",
+    "localhost,127.0.0.1"
+).split(",")
 
 INSTALLED_APPS = [
     "django.contrib.admin",
@@ -30,7 +30,6 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
-    # WhiteNoise para servir estáticos en producción
     "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "corsheaders.middleware.CorsMiddleware",
@@ -79,11 +78,10 @@ TIME_ZONE = "UTC"
 USE_I18N = True
 USE_TZ = True
 
-# -- CONFIGURACIÓN DE CORS Y REST FRAMEWORK (sin cambios) --
-
-CORS_ALLOWED_ORIGINS = [
-    "http://localhost:3000",
-]
+CORS_ALLOWED_ORIGINS = os.environ.get(
+    "CORS_ALLOWED_ORIGINS",
+    "http://localhost:3000"
+).split(",")
 CORS_ALLOW_CREDENTIALS = True
 
 REST_FRAMEWORK = {
@@ -95,17 +93,8 @@ REST_FRAMEWORK = {
     ],
 }
 
-# -- ESTÁTICOS: WhiteNoise y Collectstatic ---
-
-# URL pública de los estáticos
 STATIC_URL = "/static/"
-
-# Carpeta donde collectstatic deposita los archivos
 STATIC_ROOT = BASE_DIR / "staticfiles"
-
-# Opcional: almacenamiento en producción con compresión y cache busting
-STATICFILES_STORAGE = (
-    "whitenoise.storage.CompressedManifestStaticFilesStorage"
-)
+STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
