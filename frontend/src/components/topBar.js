@@ -14,7 +14,7 @@ export default function TopBar() {
         cursor="pointer"
         onClick={() => nav("/")}
       >
-        Proyecto Core MVC
+        Proyecto Administración MVC
       </Heading>
       {isAuthenticated && (
         <Button colorScheme="teal" ml={4} onClick={() => nav("/")}>
