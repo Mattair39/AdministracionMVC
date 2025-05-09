@@ -1,6 +1,8 @@
 import axios from "axios";
 
-const BASE_URL      = "http://localhost:8000/api/";
+const BASE_URL = process.env.REACT_APP_API_URL
+  ? process.env.REACT_APP_API_URL.replace(/\/+$/, "") + "/api/"
+  : "http://localhost:8000/api/";
 const LOGIN_URL     = `${BASE_URL}token/`;
 const REFRESH_URL   = `${BASE_URL}token/refresh/`;
 const CONTRACTS_URL = `${BASE_URL}contracts/`;
