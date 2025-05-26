@@ -9,18 +9,27 @@ from .views import (
     ContractRetrieveUpdateDestroyAPIView,
     ProjectListCreateAPIView,
     ProjectRetrieveUpdateDestroyAPIView,
+    PackageListCreateAPIView,
+    PackageRetrieveUpdateDestroyAPIView,
+    create_package_wizard,
+    get_contract_projects_for_packages,
 )
 
 urlpatterns = [
-    path("token/",         CustomTokenObtainPairView.as_view(),         name="token_obtain_pair"),
-    path("token/refresh/", CustomRefreshTokenView.as_view(),            name="token_refresh"),
-    path("logout/",        logout,                                      name="logout"),
-    path("authenticated/", is_authenticated,                            name="is_authenticated"),
-    path("register/",      register,                                    name="register"),
-
+    path("token/",         CustomTokenObtainPairView.as_view(),           name="token_obtain_pair"),
+    path("token/refresh/", CustomRefreshTokenView.as_view(),              name="token_refresh"),
+    path("logout/",        logout,                                        name="logout"),
+    path("authenticated/", is_authenticated,                              name="is_authenticated"),
+    path("register/",      register,                                      name="register"),
+    
     path("contracts/",          ContractListCreateAPIView.as_view(),           name="contract-list"),
     path("contracts/<int:pk>/", ContractRetrieveUpdateDestroyAPIView.as_view(), name="contract-detail"),
-
+    
     path("projects/",          ProjectListCreateAPIView.as_view(),            name="project-list"),
     path("projects/<int:pk>/", ProjectRetrieveUpdateDestroyAPIView.as_view(),  name="project-detail"),
+    
+    path("packages/", PackageListCreateAPIView.as_view(), name="package-list"),
+    path("packages/<int:pk>/", PackageRetrieveUpdateDestroyAPIView.as_view(), name="package-detail"),
+    path("packages/wizard/", create_package_wizard, name="package-wizard"),
+    path("contracts/<int:contract_id>/projects-for-packages/", get_contract_projects_for_packages, name="contract-projects-packages"),
 ]

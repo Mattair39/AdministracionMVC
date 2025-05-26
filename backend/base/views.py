@@ -4,8 +4,12 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.response import Response
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
-from .models import Contract, Project
-from .serializer import ContractSerializer, ProjectSerializer, UserRegistrationSerializer
+from .models import Contract, Project, Package, PackageProject
+from .serializer import (
+    ContractSerializer, ProjectSerializer, UserRegistrationSerializer,
+    PackageSerializer, PackageWizardSerializer
+)
+from rest_framework import status
 
 class CustomTokenObtainPairView(TokenObtainPairView):
     def post(self, request, *args, **kwargs):
@@ -76,3 +80,71 @@ class ProjectRetrieveUpdateDestroyAPIView(generics.RetrieveUpdateDestroyAPIView)
     queryset         = Project.objects.all()
     serializer_class = ProjectSerializer
     permission_classes = [IsAuthenticated]
+
+class PackageListCreateAPIView(generics.ListCreateAPIView):
+    serializer_class = PackageSerializer
+    permission_classes = [IsAuthenticated]
+    
+    def get_queryset(self):
+        qs = Package.objects.all().select_related('contract').prefetch_related('package_projects__project')
+        contract_id = self.request.query_params.get("contract")
+        if contract_id and contract_id.isdigit():
+            qs = qs.filter(contract_id=int(contract_id))
+        return qs
+    
+    def perform_create(self, serializer):
+        serializer.save(owner=self.request.user)
+
+class PackageRetrieveUpdateDestroyAPIView(generics.RetrieveUpdateDestroyAPIView):
+    queryset = Package.objects.all().select_related('contract').prefetch_related('package_projects__project')
+    serializer_class = PackageSerializer
+    permission_classes = [IsAuthenticated]
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def create_package_wizard(request):
+    serializer = PackageWizardSerializer(data=request.data, context={'request': request})
+    
+    if serializer.is_valid():
+        try:
+            packages = serializer.create_packages(serializer.validated_data)
+            response_serializer = PackageSerializer(packages, many=True)
+            return Response({
+                'success': True,
+                'packages': response_serializer.data,
+                'count': len(packages)
+            }, status=status.HTTP_201_CREATED)
+        except Exception as e:
+            return Response({
+                'success': False,
+                'error': str(e)
+            }, status=status.HTTP_400_BAD_REQUEST)
+    
+    return Response({
+        'success': False,
+        'errors': serializer.errors
+    }, status=status.HTTP_400_BAD_REQUEST)
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def get_contract_projects_for_packages(request, contract_id):
+    try:
+        contract = Contract.objects.get(id=contract_id)
+        projects = Project.objects.filter(contract=contract)
+        
+        projects_data = [{
+            'id': p.id,
+            'name': p.name,
+            'description': p.description
+        } for p in projects]
+        
+        return Response({
+            'contract': {
+                'id': contract.id,
+                'name': contract.contract_name,
+                'client': contract.client_name
+            },
+            'projects': projects_data
+        })
+    except Contract.DoesNotExist:
+        return Response({'error': 'Contrato no encontrado'}, status=404)

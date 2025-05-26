@@ -3,10 +3,13 @@ import axios from "axios";
 const BASE_URL = process.env.REACT_APP_API_URL
   ? process.env.REACT_APP_API_URL.replace(/\/+$/, "") + "/api/"
   : "http://localhost:8000/api/";
+
 const LOGIN_URL     = `${BASE_URL}token/`;
 const REFRESH_URL   = `${BASE_URL}token/refresh/`;
 const CONTRACTS_URL = `${BASE_URL}contracts/`;
 const PROJECTS_URL  = `${BASE_URL}projects/`;
+const PACKAGES_URL = `${BASE_URL}packages/`;
+const PACKAGE_WIZARD_URL = `${BASE_URL}packages/wizard/`;
 const LOGOUT_URL    = `${BASE_URL}logout/`;
 const AUTH_URL      = `${BASE_URL}authenticated/`;
 const REGISTER_URL  = `${BASE_URL}register/`;
@@ -103,15 +106,14 @@ export const delete_contract = async (id) => {
 
 export const get_projects = async (contractId) => {
   try {
-    const { data } = await axios.get(
-      `${PROJECTS_URL}?contract=${contractId}`,
-      { withCredentials: true }
-    );
+    const url = contractId ? `${PROJECTS_URL}?contract=${contractId}` : PROJECTS_URL;
+    const { data } = await axios.get(url, { withCredentials: true });
     return data;
   } catch (e) {
-    return call_refresh(e, () =>
-      axios.get(`${PROJECTS_URL}?contract=${contractId}`, { withCredentials: true })
-    );
+    return call_refresh(e, () => {
+      const url = contractId ? `${PROJECTS_URL}?contract=${contractId}` : PROJECTS_URL;
+      return axios.get(url, { withCredentials: true });
+    });
   }
 };
 
@@ -132,4 +134,100 @@ export const update_project = async (id, project) => {
 export const delete_project = async (id) => {
   await axios.delete(`${PROJECTS_URL}${id}/`, { withCredentials: true });
   return true;
+};
+
+export const get_packages = async (contractId) => {
+  try {
+    const url = contractId ? `${PACKAGES_URL}?contract=${contractId}` : PACKAGES_URL;
+    const { data } = await axios.get(url, { withCredentials: true });
+    return data;
+  } catch (e) {
+    return call_refresh(e, () => {
+      const url = contractId ? `${PACKAGES_URL}?contract=${contractId}` : PACKAGES_URL;
+      return axios.get(url, { withCredentials: true });
+    });
+  }
+};
+
+export const get_package = async (id) => {
+  try {
+    const { data } = await axios.get(`${PACKAGES_URL}${id}/`, { withCredentials: true });
+    return data;
+  } catch (e) {
+    return call_refresh(e, () =>
+      axios.get(`${PACKAGES_URL}${id}/`, { withCredentials: true })
+    );
+  }
+};
+
+export const create_package = async (packageData) => {
+  try {
+    const { data } = await axios.post(PACKAGES_URL, packageData, {
+      withCredentials: true,
+    });
+    return data;
+  } catch (e) {
+    const refreshed = await call_refresh(e, () =>
+      axios.post(PACKAGES_URL, packageData, { withCredentials: true })
+    );
+    if (refreshed) return refreshed;
+    throw e;
+  }
+};
+
+export const update_package = async (id, packageData) => {
+  try {
+    const { data } = await axios.put(`${PACKAGES_URL}${id}/`, packageData, {
+      withCredentials: true,
+    });
+    return data;
+  } catch (e) {
+    const refreshed = await call_refresh(e, () =>
+      axios.put(`${PACKAGES_URL}${id}/`, packageData, { withCredentials: true })
+    );
+    if (refreshed) return refreshed;
+    throw e;
+  }
+};
+
+export const delete_package = async (id) => {
+  try {
+    await axios.delete(`${PACKAGES_URL}${id}/`, {
+      withCredentials: true,
+    });
+    return true;
+  } catch (e) {
+    const refreshed = await call_refresh(e, () =>
+      axios.delete(`${PACKAGES_URL}${id}/`, { withCredentials: true })
+    );
+    return refreshed !== false;
+  }
+};
+
+export const create_package_wizard = async (wizardData) => {
+  try {
+    const { data } = await axios.post(PACKAGE_WIZARD_URL, wizardData, {
+      withCredentials: true,
+    });
+    return data;
+  } catch (e) {
+    const refreshed = await call_refresh(e, () =>
+      axios.post(PACKAGE_WIZARD_URL, wizardData, { withCredentials: true })
+    );
+    if (refreshed) return refreshed;
+    throw e;
+  }
+};
+
+export const get_contract_projects_for_packages = async (contractId) => {
+  try {
+    const { data } = await axios.get(`${BASE_URL}contracts/${contractId}/projects-for-packages/`, {
+      withCredentials: true,
+    });
+    return data;
+  } catch (e) {
+    return call_refresh(e, () =>
+      axios.get(`${BASE_URL}contracts/${contractId}/projects-for-packages/`, { withCredentials: true })
+    );
+  }
 };
