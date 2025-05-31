@@ -13,7 +13,7 @@ class UserSerializer(serializers.ModelSerializer):
 class UserRegistrationSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True)
     class Meta:
-        model  = User
+        model = User
         fields = ["username", "email", "password"]
 
     def create(self, validated_data):
@@ -26,7 +26,7 @@ class ContractSerializer(serializers.ModelSerializer):
     owner = UserSerializer(read_only=True)
 
     class Meta:
-        model  = Contract
+        model = Contract
         fields = [
             "id", "contract_name", "client_name",
             "start_date", "end_date",
