@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from django.contrib.auth.models import User
-from .models import Contract, Project, Package, PackageProject
+from .models import Contract, Project, Package, PackageProject, Ticket, Worklog
 from django.core.exceptions import ValidationError as DjangoValidationError
 from datetime import datetime, date, timedelta
 import calendar
@@ -13,7 +13,7 @@ class UserSerializer(serializers.ModelSerializer):
 class UserRegistrationSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True)
     class Meta:
-        model = User
+        model  = User
         fields = ["username", "email", "password"]
 
     def create(self, validated_data):
@@ -26,7 +26,7 @@ class ContractSerializer(serializers.ModelSerializer):
     owner = UserSerializer(read_only=True)
 
     class Meta:
-        model = Contract
+        model  = Contract
         fields = [
             "id", "contract_name", "client_name",
             "start_date", "end_date",
@@ -268,15 +268,24 @@ class PackageWizardSerializer(serializers.Serializer):
             pkg_start = pkg_info['start_date']
             pkg_end = pkg_info['end_date']
             
-            # Generar nombre automático
+            # Generar nombre automático con timestamp para evitar duplicados
+            timestamp = datetime.now().strftime("%H%M%S")
+            
             if is_full_month:
                 month_names = [
                     "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
                     "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"
                 ]
-                package_name = f"Paquete {contract.contract_name} - {month_names[pkg_start.month - 1]} {pkg_start.year}"
+                base_name = f"Paquete {contract.contract_name} - {month_names[pkg_start.month - 1]} {pkg_start.year}"
             else:
-                package_name = f"Paquete {contract.contract_name} - {pkg_start.strftime('%d/%m/%Y')} - {pkg_end.strftime('%d/%m/%Y')}"
+                base_name = f"Paquete {contract.contract_name} - {pkg_start.strftime('%d/%m/%Y')} - {pkg_end.strftime('%d/%m/%Y')}"
+            
+            # Verificar si ya existe y agregar contador si es necesario
+            package_name = base_name
+            counter = 1
+            while Package.objects.filter(contract=contract, package_name=package_name).exists():
+                package_name = f"{base_name} ({counter})"
+                counter += 1
             
             # Crear paquete con horas equitativas
             package = Package.objects.create(
@@ -300,3 +309,43 @@ class PackageWizardSerializer(serializers.Serializer):
             packages.append(package)
         
         return packages
+
+class WorklogSerializer(serializers.ModelSerializer):
+    user_name = serializers.CharField(source="user.username", read_only=True)
+    
+    class Meta:
+        model = Worklog
+        fields = [
+            "id", "work_date", "hours_logged", "description", 
+            "user", "user_name", "created_at", "updated_at"
+        ]
+
+class TicketSerializer(serializers.ModelSerializer):
+    project_name = serializers.CharField(source="project.name", read_only=True)
+    # Cambio: assigned_user_name puede ser None, manejarlo adecuadamente
+    assigned_user_name = serializers.SerializerMethodField()
+    worklogs = WorklogSerializer(many=True, read_only=True)
+    total_hours = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = Ticket
+        fields = [
+            "ticket_id", "subject", "description", "project", "project_name",
+            "assigned_user", "assigned_user_name", "requester", "status",
+            "worklogs", "total_hours", "created_at", "updated_at"
+        ]
+    
+    def get_assigned_user_name(self, obj):
+        return obj.assigned_user.username if obj.assigned_user else "Sin asignar"
+    
+    def get_total_hours(self, obj):
+        return sum(worklog.hours_logged for worklog in obj.worklogs.all())
+
+class WorklogCreateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Worklog
+        fields = ["work_date", "hours_logged", "description", "user"]
+    
+    def create(self, validated_data):
+        validated_data['ticket'] = self.context['ticket']
+        return super().create(validated_data)

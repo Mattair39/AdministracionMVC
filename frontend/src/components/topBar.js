@@ -26,6 +26,11 @@ export default function TopBar() {
           Proyectos
         </Button>
       )}
+      {isAuthenticated && (
+        <Button colorScheme="teal" ml={4} onClick={() => nav("/tickets")}>
+          Tickets
+        </Button>
+      )}
       <Spacer />
       {isAuthenticated && (
         <Text color="gray.100" mr={4}>

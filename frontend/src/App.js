@@ -16,6 +16,9 @@ import ContractForm from "./routes/contractForm";
 import ContractDetail from "./routes/contractDetail";
 import ProjectsList from "./routes/projectsList";
 import ProjectForm from "./routes/projectForm";
+import TicketsList from "./routes/TicketsList";
+import TicketForm from "./routes/TicketForm";
+import TicketDetail from "./routes/TicketDetail";
 
 const theme = extendTheme({
   config: { initialColorMode: "dark", useSystemColorMode: false },
@@ -94,6 +97,31 @@ export default function App() {
                 element={
                   <PrivateRoute>
                     <ProjectForm />
+                  </PrivateRoute>
+                }
+              />
+
+              <Route
+                path="/tickets"
+                element={
+                  <PrivateRoute>
+                    <TicketsList />
+                  </PrivateRoute>
+                }
+              />
+              <Route
+                path="/tickets/new"
+                element={
+                  <PrivateRoute>
+                    <TicketForm />
+                  </PrivateRoute>
+                }
+              />
+              <Route
+                path="/tickets/:ticketId"
+                element={
+                  <PrivateRoute>
+                    <TicketDetail />
                   </PrivateRoute>
                 }
               />

@@ -1,0 +1,311 @@
+import React, { useState, useEffect } from "react";
+import {
+  Box, Flex, Heading, Button, IconButton, Spinner, Select,
+  Tabs, TabList, TabPanels, Tab, TabPanel,
+  Table, Thead, Tbody, Tr, Th, Td, Input, Textarea
+} from "@chakra-ui/react";
+import { DeleteIcon } from "@chakra-ui/icons";
+import { useParams, useNavigate } from "react-router-dom";
+import {
+  get_ticket, update_ticket,
+  get_users, create_worklog, delete_worklog
+} from "../endpoints/api";
+
+export default function TicketDetail() {
+  const { ticketId } = useParams();
+  const nav = useNavigate();
+  const [ticket, setTicket] = useState(null);
+  const [users, setUsers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [worklogForm, setWorklogForm] = useState({
+    work_date: new Date().toISOString().slice(0, 16),
+    hours_logged: '',
+    description: '',
+    user: ''
+  });
+
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        const [ticketData, usersData] = await Promise.all([
+          get_ticket(ticketId),
+          get_users()
+        ]);
+        setTicket(ticketData);
+        
+        // Asegurar que users es siempre un array
+        const usersArray = Array.isArray(usersData) ? usersData : [];
+        setUsers(usersArray);
+        
+        // Solo establecer un usuario por defecto si hay usuarios disponibles
+        if (usersArray.length > 0) {
+          setWorklogForm(prev => ({ ...prev, user: usersArray[0].id }));
+        }
+      } catch (error) {
+        console.error('Error loading data:', error);
+        setUsers([]); // Asegurar que es un array vacío en caso de error
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (ticketId) {
+      loadData();
+    }
+  }, [ticketId]);
+
+  if (loading) return <Spinner color="teal" />;
+  if (!ticket) return <div>Error cargando ticket</div>;
+
+  const handleTicketChange = (field, value) => {
+    setTicket(prev => ({ ...prev, [field]: value }));
+  };
+
+  const saveTicket = async () => {
+    try {
+      await update_ticket(ticketId, {
+        subject: ticket.subject,
+        description: ticket.description,
+        assigned_user: ticket.assigned_user || null,
+        requester: ticket.requester,
+        status: ticket.status,
+        project: ticket.project
+      });
+    } catch (error) {
+      console.error('Error saving ticket:', error);
+    }
+  };
+
+  const handleWorklogChange = (e) => {
+    const { name, value } = e.target;
+    setWorklogForm(prev => ({ ...prev, [name]: value }));
+  };
+
+  const addWorklog = async () => {
+    if (!worklogForm.hours_logged || !worklogForm.description) return;
+    
+    try {
+      await create_worklog(ticketId, worklogForm);
+      const updatedTicket = await get_ticket(ticketId);
+      setTicket(updatedTicket);
+      setWorklogForm({
+        work_date: new Date().toISOString().slice(0, 16),
+        hours_logged: '',
+        description: '',
+        user: users.length > 0 ? users[0].id : ''
+      });
+    } catch (error) {
+      console.error('Error creating worklog:', error);
+    }
+  };
+
+  const removeWorklog = async (worklogId) => {
+    try {
+      await delete_worklog(worklogId);
+      const updatedTicket = await get_ticket(ticketId);
+      setTicket(updatedTicket);
+    } catch (error) {
+      console.error('Error deleting worklog:', error);
+    }
+  };
+
+  return (
+    <Box w="100%" maxW="1200px" bg="gray.800" p={6} rounded="lg">
+      <Flex justify="space-between" align="center" mb={6}>
+        <Heading size="lg">Ticket #{ticket.ticket_id} - {ticket.subject}</Heading>
+        <Button onClick={() => nav(-1)} colorScheme="teal">Volver</Button>
+      </Flex>
+
+      <Flex mb={6} gap={4}>
+        <Box bg="orange.500" px={3} py={1} rounded="md" color="white" fontSize="sm">
+          {ticket.status}
+        </Box>
+        <Box bg="gray.600" px={3} py={1} rounded="md" color="white" fontSize="sm">
+          {ticket.project_name}
+        </Box>
+      </Flex>
+
+      <Box mb={6}>
+        <Flex gap={6} mb={4}>
+          <Box>
+            <Heading size="sm" color="gray.300">Solicitante</Heading>
+            <Input
+              value={ticket.requester || ""}
+              onChange={(e) => handleTicketChange('requester', e.target.value)}
+              onBlur={saveTicket}
+              bg="gray.700"
+              borderColor="gray.600"
+              color="white"
+            />
+          </Box>
+          <Box>
+            <Heading size="sm" color="gray.300">Usuario asignado</Heading>
+            <Select
+              value={ticket.assigned_user || ""}
+              onChange={(e) => handleTicketChange('assigned_user', e.target.value || null)}
+              onBlur={saveTicket}
+              bg="gray.700"
+              borderColor="gray.600"
+              color="white"
+            >
+              <option value="" style={{color: 'black'}}>Sin asignar</option>
+              {Array.isArray(users) && users.map(user => (
+                <option key={user.id} value={user.id} style={{color: 'black'}}>{user.username}</option>
+              ))}
+            </Select>
+          </Box>
+          <Box>
+            <Heading size="sm" color="gray.300">Estado</Heading>
+            <Select
+              value={ticket.status}
+              onChange={(e) => handleTicketChange('status', e.target.value)}
+              onBlur={saveTicket}
+              bg="gray.700"
+              borderColor="gray.600"
+              color="white"
+            >
+              <option value="Recibido" style={{color: 'black'}}>Recibido</option>
+              <option value="En Proceso" style={{color: 'black'}}>En Proceso</option>
+              <option value="Entregado" style={{color: 'black'}}>Entregado</option>
+            </Select>
+          </Box>
+        </Flex>
+      </Box>
+
+      <Tabs variant="enclosed" colorScheme="teal">
+        <TabList mb="1em">
+          <Tab>Descripción</Tab>
+          <Tab>Registros de trabajo</Tab>
+        </TabList>
+        <TabPanels>
+
+          <TabPanel>
+            <Box>
+              <Heading size="sm" color="gray.300" mb={2}>Descripción del requerimiento</Heading>
+              <Textarea
+                value={ticket.description}
+                onChange={(e) => handleTicketChange('description', e.target.value)}
+                onBlur={saveTicket}
+                bg="gray.700"
+                borderColor="gray.600"
+                color="white"
+                rows={10}
+                placeholder="Describe el requerimiento..."
+              />
+            </Box>
+          </TabPanel>
+
+          <TabPanel>
+            <Box mb={6}>
+              <Heading size="md" mb={4}>Agregar registro de trabajo</Heading>
+              <Flex gap={4} mb={4} align="end">
+                <Box>
+                  <Heading size="sm" color="gray.300">Usuario</Heading>
+                  <Select
+                    name="user"
+                    value={worklogForm.user}
+                    onChange={handleWorklogChange}
+                    bg="gray.700"
+                    borderColor="gray.600"
+                    color="white"
+                    w="200px"
+                  >
+                    <option value="" style={{color: 'black'}}>Seleccionar usuario</option>
+                    {Array.isArray(users) && users.map(user => (
+                      <option key={user.id} value={user.id} style={{color: 'black'}}>{user.username}</option>
+                    ))}
+                  </Select>
+                </Box>
+                <Box>
+                  <Heading size="sm" color="gray.300">Fecha del trabajo</Heading>
+                  <Input
+                    type="datetime-local"
+                    name="work_date"
+                    value={worklogForm.work_date}
+                    onChange={handleWorklogChange}
+                    bg="gray.700"
+                    borderColor="gray.600"
+                    color="white"
+                    w="200px"
+                  />
+                </Box>
+                <Box>
+                  <Heading size="sm" color="gray.300">Duración en horas</Heading>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    name="hours_logged"
+                    value={worklogForm.hours_logged}
+                    onChange={handleWorklogChange}
+                    bg="gray.700"
+                    borderColor="gray.600"
+                    color="white"
+                    w="150px"
+                    placeholder="0.00"
+                  />
+                </Box>
+                <Box flex="1">
+                  <Heading size="sm" color="gray.300">Descripción del trabajo</Heading>
+                  <Input
+                    name="description"
+                    value={worklogForm.description}
+                    onChange={handleWorklogChange}
+                    bg="gray.700"
+                    borderColor="gray.600"
+                    color="white"
+                    placeholder="Describe el trabajo realizado..."
+                  />
+                </Box>
+                <Button colorScheme="orange" onClick={addWorklog}>
+                  Agregar línea
+                </Button>
+              </Flex>
+            </Box>
+
+            <Box>
+              <Heading size="md" mb={4}>Registros de trabajo</Heading>
+              <Table variant="simple">
+                <Thead>
+                  <Tr>
+                    <Th>Usuario</Th>
+                    <Th>Fecha del trabajo</Th>
+                    <Th>Duración en horas</Th>
+                    <Th>Descripción del trabajo</Th>
+                    <Th isNumeric></Th>
+                  </Tr>
+                </Thead>
+                <Tbody>
+                  {Array.isArray(ticket.worklogs) && ticket.worklogs.map(worklog => (
+                    <Tr key={worklog.id}>
+                      <Td>{worklog.user_name}</Td>
+                      <Td>{new Date(worklog.work_date).toLocaleString()}</Td>
+                      <Td>{worklog.hours_logged}</Td>
+                      <Td>{worklog.description}</Td>
+                      <Td isNumeric>
+                        <IconButton
+                          icon={<DeleteIcon />}
+                          size="sm"
+                          colorScheme="red"
+                          onClick={() => removeWorklog(worklog.id)}
+                        />
+                      </Td>
+                    </Tr>
+                  ))}
+                </Tbody>
+              </Table>
+              
+              {Array.isArray(ticket.worklogs) && ticket.worklogs.length > 0 && (
+                <Box mt={4} p={3} bg="gray.700" rounded="md">
+                  <Heading size="sm" color="teal.300">
+                    Total de horas registradas: {ticket.total_hours}
+                  </Heading>
+                </Box>
+              )}
+            </Box>
+          </TabPanel>
+
+        </TabPanels>
+      </Tabs>
+    </Box>
+  );
+}

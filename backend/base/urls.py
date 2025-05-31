@@ -13,6 +13,11 @@ from .views import (
     PackageRetrieveUpdateDestroyAPIView,
     create_package_wizard,
     get_contract_projects_for_packages,
+    TicketListCreateAPIView,
+    TicketRetrieveUpdateDestroyAPIView,
+    get_users_for_assignment,
+    create_worklog,
+    delete_worklog,
 )
 
 urlpatterns = [
@@ -32,4 +37,10 @@ urlpatterns = [
     path("packages/<int:pk>/", PackageRetrieveUpdateDestroyAPIView.as_view(), name="package-detail"),
     path("packages/wizard/", create_package_wizard, name="package-wizard"),
     path("contracts/<int:contract_id>/projects-for-packages/", get_contract_projects_for_packages, name="contract-projects-packages"),
+    
+    path("tickets/", TicketListCreateAPIView.as_view(), name="ticket-list"),
+    path("tickets/<int:ticket_id>/", TicketRetrieveUpdateDestroyAPIView.as_view(), name="ticket-detail"),
+    path("users/", get_users_for_assignment, name="users-list"),
+    path("tickets/<int:ticket_id>/worklogs/", create_worklog, name="create-worklog"),
+    path("worklogs/<int:worklog_id>/", delete_worklog, name="delete-worklog"),
 ]

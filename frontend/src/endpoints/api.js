@@ -10,6 +10,8 @@ const CONTRACTS_URL = `${BASE_URL}contracts/`;
 const PROJECTS_URL  = `${BASE_URL}projects/`;
 const PACKAGES_URL = `${BASE_URL}packages/`;
 const PACKAGE_WIZARD_URL = `${BASE_URL}packages/wizard/`;
+const TICKETS_URL  = `${BASE_URL}tickets/`;
+const USERS_URL = `${BASE_URL}users/`;
 const LOGOUT_URL    = `${BASE_URL}logout/`;
 const AUTH_URL      = `${BASE_URL}authenticated/`;
 const REGISTER_URL  = `${BASE_URL}register/`;
@@ -229,5 +231,113 @@ export const get_contract_projects_for_packages = async (contractId) => {
     return call_refresh(e, () =>
       axios.get(`${BASE_URL}contracts/${contractId}/projects-for-packages/`, { withCredentials: true })
     );
+  }
+};
+
+export const get_tickets = async (projectId) => {
+  try {
+    const url = projectId ? `${TICKETS_URL}?project=${projectId}` : TICKETS_URL;
+    const { data } = await axios.get(url, { withCredentials: true });
+    return data;
+  } catch (e) {
+    return call_refresh(e, () => {
+      const url = projectId ? `${TICKETS_URL}?project=${projectId}` : TICKETS_URL;
+      return axios.get(url, { withCredentials: true });
+    });
+  }
+};
+
+export const get_ticket = async (ticketId) => {
+  try {
+    const { data } = await axios.get(`${TICKETS_URL}${ticketId}/`, { withCredentials: true });
+    return data;
+  } catch (e) {
+    return call_refresh(e, () =>
+      axios.get(`${TICKETS_URL}${ticketId}/`, { withCredentials: true })
+    );
+  }
+};
+
+export const create_ticket = async (ticketData) => {
+  try {
+    const { data } = await axios.post(TICKETS_URL, ticketData, {
+      withCredentials: true,
+    });
+    return data;
+  } catch (e) {
+    const refreshed = await call_refresh(e, () =>
+      axios.post(TICKETS_URL, ticketData, { withCredentials: true })
+    );
+    if (refreshed) return refreshed;
+    throw e;
+  }
+};
+
+export const update_ticket = async (ticketId, ticketData) => {
+  try {
+    const { data } = await axios.put(`${TICKETS_URL}${ticketId}/`, ticketData, {
+      withCredentials: true,
+    });
+    return data;
+  } catch (e) {
+    const refreshed = await call_refresh(e, () =>
+      axios.put(`${TICKETS_URL}${ticketId}/`, ticketData, { withCredentials: true })
+    );
+    if (refreshed) return refreshed;
+    throw e;
+  }
+};
+
+export const delete_ticket = async (ticketId) => {
+  try {
+    await axios.delete(`${TICKETS_URL}${ticketId}/`, {
+      withCredentials: true,
+    });
+    return true;
+  } catch (e) {
+    const refreshed = await call_refresh(e, () =>
+      axios.delete(`${TICKETS_URL}${ticketId}/`, { withCredentials: true })
+    );
+    return refreshed !== false;
+  }
+};
+
+export const get_users = async () => {
+  try {
+    const { data } = await axios.get(USERS_URL, { withCredentials: true });
+    return data;
+  } catch (e) {
+    return call_refresh(e, () =>
+      axios.get(USERS_URL, { withCredentials: true })
+    );
+  }
+};
+
+export const create_worklog = async (ticketId, worklogData) => {
+  try {
+    const { data } = await axios.post(`${TICKETS_URL}${ticketId}/worklogs/`, worklogData, {
+      withCredentials: true,
+    });
+    return data;
+  } catch (e) {
+    const refreshed = await call_refresh(e, () =>
+      axios.post(`${TICKETS_URL}${ticketId}/worklogs/`, worklogData, { withCredentials: true })
+    );
+    if (refreshed) return refreshed;
+    throw e;
+  }
+};
+
+export const delete_worklog = async (worklogId) => {
+  try {
+    await axios.delete(`${BASE_URL}worklogs/${worklogId}/`, {
+      withCredentials: true,
+    });
+    return true;
+  } catch (e) {
+    const refreshed = await call_refresh(e, () =>
+      axios.delete(`${BASE_URL}worklogs/${worklogId}/`, { withCredentials: true })
+    );
+    return refreshed !== false;
   }
 };

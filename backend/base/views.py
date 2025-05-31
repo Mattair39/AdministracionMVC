@@ -4,10 +4,11 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.response import Response
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
-from .models import Contract, Project, Package, PackageProject
+from django.contrib.auth.models import User
+from .models import Contract, Project, Package, PackageProject, Ticket, Worklog
 from .serializer import (
     ContractSerializer, ProjectSerializer, UserRegistrationSerializer,
-    PackageSerializer, PackageWizardSerializer
+    PackageSerializer, PackageWizardSerializer, TicketSerializer, WorklogSerializer, WorklogCreateSerializer
 )
 from rest_framework import status
 
@@ -148,3 +149,57 @@ def get_contract_projects_for_packages(request, contract_id):
         })
     except Contract.DoesNotExist:
         return Response({'error': 'Contrato no encontrado'}, status=404)
+
+class TicketListCreateAPIView(generics.ListCreateAPIView):
+    serializer_class = TicketSerializer
+    permission_classes = [IsAuthenticated]
+    
+    def get_queryset(self):
+        qs = Ticket.objects.all().select_related('project', 'assigned_user').prefetch_related('worklogs')
+        project_id = self.request.query_params.get("project")
+        if project_id and project_id.isdigit():
+            qs = qs.filter(project_id=int(project_id))
+        return qs.order_by('-created_at')
+    
+    def perform_create(self, serializer):
+        # El assigned_user puede ser None, no lo establecemos por defecto
+        serializer.save(owner=self.request.user)
+
+class TicketRetrieveUpdateDestroyAPIView(generics.RetrieveUpdateDestroyAPIView):
+    queryset = Ticket.objects.all().select_related('project', 'assigned_user').prefetch_related('worklogs')
+    serializer_class = TicketSerializer
+    permission_classes = [IsAuthenticated]
+    lookup_field = 'ticket_id'
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def get_users_for_assignment(request):
+    try:
+        users = User.objects.all().values('id', 'username')
+        return Response(list(users))
+    except Exception as e:
+        return Response({'error': str(e)}, status=500)
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def create_worklog(request, ticket_id):
+    try:
+        ticket = Ticket.objects.get(ticket_id=ticket_id)
+        serializer = WorklogCreateSerializer(data=request.data, context={'ticket': ticket})
+        
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    except Ticket.DoesNotExist:
+        return Response({'error': 'Ticket no encontrado'}, status=404)
+
+@api_view(["DELETE"])
+@permission_classes([IsAuthenticated])
+def delete_worklog(request, worklog_id):
+    try:
+        worklog = Worklog.objects.get(id=worklog_id)
+        worklog.delete()
+        return Response({'success': True}, status=status.HTTP_204_NO_CONTENT)
+    except Worklog.DoesNotExist:
+        return Response({'error': 'Worklog no encontrado'}, status=404)
