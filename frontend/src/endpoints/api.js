@@ -69,6 +69,7 @@ export const register = async (username, email, password) => {
   return data;
 };
 
+// ============= CONTRACTS =============
 export const get_contracts = async () => {
   try {
     const { data } = await axios.get(CONTRACTS_URL, { withCredentials: true });
@@ -81,31 +82,61 @@ export const get_contracts = async () => {
 };
 
 export const get_contract = async (id) => {
-  const { data } = await axios.get(`${CONTRACTS_URL}${id}/`, { withCredentials: true });
-  return data;
+  try {
+    const { data } = await axios.get(`${CONTRACTS_URL}${id}/`, { withCredentials: true });
+    return data;
+  } catch (e) {
+    return call_refresh(e, () =>
+      axios.get(`${CONTRACTS_URL}${id}/`, { withCredentials: true })
+    );
+  }
 };
 
 export const create_contract = async (contract) => {
-  const { data } = await axios.post(CONTRACTS_URL, contract, {
-    withCredentials: true,
-  });
-  return data;
+  try {
+    const { data } = await axios.post(CONTRACTS_URL, contract, {
+      withCredentials: true,
+    });
+    return data;
+  } catch (e) {
+    const refreshed = await call_refresh(e, () =>
+      axios.post(CONTRACTS_URL, contract, { withCredentials: true })
+    );
+    if (refreshed) return refreshed;
+    throw e;
+  }
 };
 
 export const update_contract = async (id, contract) => {
-  const { data } = await axios.put(`${CONTRACTS_URL}${id}/`, contract, {
-    withCredentials: true,
-  });
-  return data;
+  try {
+    const { data } = await axios.put(`${CONTRACTS_URL}${id}/`, contract, {
+      withCredentials: true,
+    });
+    return data;
+  } catch (e) {
+    const refreshed = await call_refresh(e, () =>
+      axios.put(`${CONTRACTS_URL}${id}/`, contract, { withCredentials: true })
+    );
+    if (refreshed) return refreshed;
+    throw e;
+  }
 };
 
 export const delete_contract = async (id) => {
-  await axios.delete(`${CONTRACTS_URL}${id}/`, {
-    withCredentials: true,
-  });
-  return true;
+  try {
+    await axios.delete(`${CONTRACTS_URL}${id}/`, {
+      withCredentials: true,
+    });
+    return true;
+  } catch (e) {
+    const refreshed = await call_refresh(e, () =>
+      axios.delete(`${CONTRACTS_URL}${id}/`, { withCredentials: true })
+    );
+    return refreshed !== false;
+  }
 };
 
+// ============= PROJECTS =============
 export const get_projects = async (contractId) => {
   try {
     const url = contractId ? `${PROJECTS_URL}?contract=${contractId}` : PROJECTS_URL;
@@ -119,25 +150,60 @@ export const get_projects = async (contractId) => {
   }
 };
 
+export const get_project = async (id) => {
+  try {
+    const { data } = await axios.get(`${PROJECTS_URL}${id}/`, { withCredentials: true });
+    return data;
+  } catch (e) {
+    return call_refresh(e, () =>
+      axios.get(`${PROJECTS_URL}${id}/`, { withCredentials: true })
+    );
+  }
+};
+
 export const create_project = async (project) => {
-  const { data } = await axios.post(PROJECTS_URL, project, {
-    withCredentials: true,
-  });
-  return data;
+  try {
+    const { data } = await axios.post(PROJECTS_URL, project, {
+      withCredentials: true,
+    });
+    return data;
+  } catch (e) {
+    const refreshed = await call_refresh(e, () =>
+      axios.post(PROJECTS_URL, project, { withCredentials: true })
+    );
+    if (refreshed) return refreshed;
+    throw e;
+  }
 };
 
 export const update_project = async (id, project) => {
-  const { data } = await axios.put(`${PROJECTS_URL}${id}/`, project, {
-    withCredentials: true,
-  });
-  return data;
+  try {
+    const { data } = await axios.put(`${PROJECTS_URL}${id}/`, project, {
+      withCredentials: true,
+    });
+    return data;
+  } catch (e) {
+    const refreshed = await call_refresh(e, () =>
+      axios.put(`${PROJECTS_URL}${id}/`, project, { withCredentials: true })
+    );
+    if (refreshed) return refreshed;
+    throw e;
+  }
 };
 
 export const delete_project = async (id) => {
-  await axios.delete(`${PROJECTS_URL}${id}/`, { withCredentials: true });
-  return true;
+  try {
+    await axios.delete(`${PROJECTS_URL}${id}/`, { withCredentials: true });
+    return true;
+  } catch (e) {
+    const refreshed = await call_refresh(e, () =>
+      axios.delete(`${PROJECTS_URL}${id}/`, { withCredentials: true })
+    );
+    return refreshed !== false;
+  }
 };
 
+// ============= PACKAGES =============
 export const get_packages = async (contractId) => {
   try {
     const url = contractId ? `${PACKAGES_URL}?contract=${contractId}` : PACKAGES_URL;
@@ -234,6 +300,7 @@ export const get_contract_projects_for_packages = async (contractId) => {
   }
 };
 
+// ============= TICKETS =============
 export const get_tickets = async (projectId) => {
   try {
     const url = projectId ? `${TICKETS_URL}?project=${projectId}` : TICKETS_URL;
@@ -302,6 +369,7 @@ export const delete_ticket = async (ticketId) => {
   }
 };
 
+// ============= USERS =============
 export const get_users = async () => {
   try {
     const { data } = await axios.get(USERS_URL, { withCredentials: true });
@@ -313,6 +381,7 @@ export const get_users = async () => {
   }
 };
 
+// ============= WORKLOGS =============
 export const create_worklog = async (ticketId, worklogData) => {
   try {
     const { data } = await axios.post(`${TICKETS_URL}${ticketId}/worklogs/`, worklogData, {

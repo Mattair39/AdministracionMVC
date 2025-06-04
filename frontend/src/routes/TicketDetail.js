@@ -33,17 +33,15 @@ export default function TicketDetail() {
         ]);
         setTicket(ticketData);
         
-        // Asegurar que users es siempre un array
         const usersArray = Array.isArray(usersData) ? usersData : [];
         setUsers(usersArray);
         
-        // Solo establecer un usuario por defecto si hay usuarios disponibles
         if (usersArray.length > 0) {
           setWorklogForm(prev => ({ ...prev, user: usersArray[0].id }));
         }
       } catch (error) {
         console.error('Error loading data:', error);
-        setUsers([]); // Asegurar que es un array vacío en caso de error
+        setUsers([]);
       } finally {
         setLoading(false);
       }
@@ -81,10 +79,36 @@ export default function TicketDetail() {
     setWorklogForm(prev => ({ ...prev, [name]: value }));
   };
 
+  // Función para convertir horas decimales a formato HH:MM
+  const decimalToTime = (decimal) => {
+    const hours = Math.floor(decimal);
+    const minutes = Math.round((decimal - hours) * 60);
+    return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+  };
+
+  // Función para validar formato HH:MM
+  const validateTimeFormat = (timeStr) => {
+    const timeRegex = /^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/;
+    return timeRegex.test(timeStr);
+  };
+
+  // Función para convertir HH:MM a decimal
+  const timeToDecimal = (timeStr) => {
+    const [hours, minutes] = timeStr.split(':').map(Number);
+    return hours + (minutes / 60);
+  };
+
   const addWorklog = async () => {
     if (!worklogForm.hours_logged || !worklogForm.description) return;
     
+    // Validar formato de tiempo
+    if (!validateTimeFormat(worklogForm.hours_logged)) {
+      alert('Por favor, ingrese las horas en formato HH:MM (ej: 02:30)');
+      return;
+    }
+    
     try {
+      // El backend ahora puede manejar formato HH:MM directamente
       await create_worklog(ticketId, worklogForm);
       const updatedTicket = await get_ticket(ticketId);
       setTicket(updatedTicket);
@@ -96,6 +120,9 @@ export default function TicketDetail() {
       });
     } catch (error) {
       console.error('Error creating worklog:', error);
+      if (error.response?.data?.hours_logged) {
+        alert('Error en formato de horas: ' + error.response.data.hours_logged[0]);
+      }
     }
   };
 
@@ -230,10 +257,8 @@ export default function TicketDetail() {
                   />
                 </Box>
                 <Box>
-                  <Heading size="sm" color="gray.300">Duración en horas</Heading>
+                  <Heading size="sm" color="gray.300">Duración (HH:MM)</Heading>
                   <Input
-                    type="number"
-                    step="0.01"
                     name="hours_logged"
                     value={worklogForm.hours_logged}
                     onChange={handleWorklogChange}
@@ -241,7 +266,8 @@ export default function TicketDetail() {
                     borderColor="gray.600"
                     color="white"
                     w="150px"
-                    placeholder="0.00"
+                    placeholder="02:30"
+                    pattern="[0-9]{1,2}:[0-5][0-9]"
                   />
                 </Box>
                 <Box flex="1">
@@ -260,6 +286,9 @@ export default function TicketDetail() {
                   Agregar línea
                 </Button>
               </Flex>
+              <Box fontSize="sm" color="gray.400" mt={2}>
+                * Ingrese las horas en formato HH:MM (ejemplo: 02:30 para 2 horas y 30 minutos)
+              </Box>
             </Box>
 
             <Box>
@@ -269,7 +298,7 @@ export default function TicketDetail() {
                   <Tr>
                     <Th>Usuario</Th>
                     <Th>Fecha del trabajo</Th>
-                    <Th>Duración en horas</Th>
+                    <Th>Duración</Th>
                     <Th>Descripción del trabajo</Th>
                     <Th isNumeric></Th>
                   </Tr>
@@ -279,7 +308,16 @@ export default function TicketDetail() {
                     <Tr key={worklog.id}>
                       <Td>{worklog.user_name}</Td>
                       <Td>{new Date(worklog.work_date).toLocaleString()}</Td>
-                      <Td>{worklog.hours_logged}</Td>
+                      <Td>
+                        <Flex direction="column">
+                          <Box fontWeight="bold">
+                            {decimalToTime(parseFloat(worklog.hours_logged))}
+                          </Box>
+                          <Box fontSize="xs" color="gray.400">
+                            ({parseFloat(worklog.hours_logged).toFixed(2)}h)
+                          </Box>
+                        </Flex>
+                      </Td>
                       <Td>{worklog.description}</Td>
                       <Td isNumeric>
                         <IconButton
@@ -297,7 +335,7 @@ export default function TicketDetail() {
               {Array.isArray(ticket.worklogs) && ticket.worklogs.length > 0 && (
                 <Box mt={4} p={3} bg="gray.700" rounded="md">
                   <Heading size="sm" color="teal.300">
-                    Total de horas registradas: {ticket.total_hours}
+                    Total de horas registradas: {decimalToTime(parseFloat(ticket.total_hours || 0))} ({parseFloat(ticket.total_hours || 0).toFixed(2)}h)
                   </Heading>
                 </Box>
               )}

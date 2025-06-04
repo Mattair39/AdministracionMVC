@@ -4,12 +4,12 @@ from django.core.exceptions import ValidationError
 
 class Contract(models.Model):
     contract_name = models.CharField(max_length=120, unique=True)
-    client_name   = models.CharField(max_length=120)
-    start_date    = models.DateField()
-    end_date      = models.DateField()
-    created_at    = models.DateTimeField(auto_now_add=True)
-    updated_at    = models.DateTimeField(auto_now=True)
-    owner         = models.ForeignKey(User, on_delete=models.CASCADE, related_name='contracts')
+    client_name = models.CharField(max_length=120)
+    start_date = models.DateField()
+    end_date = models.DateField()
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    owner = models.ForeignKey(User, on_delete=models.CASCADE, related_name='contracts')
 
     def clean(self):
         if self.end_date < self.start_date:
@@ -19,12 +19,12 @@ class Contract(models.Model):
         return f"{self.contract_name} ({self.client_name})"
 
 class Project(models.Model):
-    name        = models.CharField(max_length=120)
+    name = models.CharField(max_length=120)
     description = models.CharField(max_length=250)
-    contract    = models.ForeignKey(Contract, on_delete=models.CASCADE, related_name='projects')
-    owner       = models.ForeignKey(User, on_delete=models.CASCADE, related_name='projects')
-    created_at  = models.DateTimeField(auto_now_add=True)
-    updated_at  = models.DateTimeField(auto_now=True)
+    contract = models.ForeignKey(Contract, on_delete=models.CASCADE, related_name='projects')
+    owner = models.ForeignKey(User, on_delete=models.CASCADE, related_name='projects')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         constraints = [
@@ -87,7 +87,6 @@ class Ticket(models.Model):
     subject = models.CharField(max_length=200)
     description = models.TextField()
     project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name='tickets')
-    # Cambio: assigned_user ahora es opcional (null=True, blank=True)
     assigned_user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='assigned_tickets', null=True, blank=True)
     requester = models.CharField(max_length=200, blank=True)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='Recibido')

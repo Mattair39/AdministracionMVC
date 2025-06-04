@@ -5,12 +5,16 @@ from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.response import Response
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 from django.contrib.auth.models import User
+from django.utils import timezone
+from django.db.models import Sum, Q
 from .models import Contract, Project, Package, PackageProject, Ticket, Worklog
 from .serializer import (
     ContractSerializer, ProjectSerializer, UserRegistrationSerializer,
     PackageSerializer, PackageWizardSerializer, TicketSerializer, WorklogSerializer, WorklogCreateSerializer
 )
 from rest_framework import status
+from datetime import datetime, time
+import re
 
 class CustomTokenObtainPairView(TokenObtainPairView):
     def post(self, request, *args, **kwargs):
@@ -65,22 +69,133 @@ class ContractRetrieveUpdateDestroyAPIView(generics.RetrieveUpdateDestroyAPIView
     serializer_class = ContractSerializer
     permission_classes = [IsAuthenticated]
 
+def calculate_available_hours(project):
+    """Calcula las horas disponibles para un proyecto basado en paquetes vigentes"""
+    today = timezone.now().date()
+    
+    # Obtener paquetes vigentes (activos en la fecha actual)
+    active_packages = Package.objects.filter(
+        package_projects__project=project,
+        start_date__lte=today,
+        end_date__gte=today
+    )
+    
+    # Sumar las horas totales de los paquetes activos
+    total_package_hours = active_packages.aggregate(
+        total=Sum('total_hours')
+    )['total'] or 0
+    
+    # CORRECCIÓN: Calcular las horas consumidas UNA SOLA VEZ por proyecto
+    # No por cada paquete, sino el total de horas consumidas en el proyecto
+    # dentro del rango de fechas que cubren TODOS los paquetes activos
+    
+    if active_packages.exists():
+        # Obtener el rango de fechas mínimo y máximo de todos los paquetes activos
+        date_ranges = active_packages.values_list('start_date', 'end_date')
+        min_start_date = min(date_range[0] for date_range in date_ranges)
+        max_end_date = max(date_range[1] for date_range in date_ranges)
+        
+        # Calcular horas consumidas en el proyecto dentro del rango total
+        consumed_hours = Worklog.objects.filter(
+            ticket__project=project,
+            work_date__date__gte=min_start_date,
+            work_date__date__lte=max_end_date
+        ).aggregate(total=Sum('hours_logged'))['total'] or 0
+    else:
+        consumed_hours = 0
+    
+    available_hours = total_package_hours - consumed_hours
+    
+    return {
+        'total_package_hours': float(total_package_hours),
+        'consumed_hours': float(consumed_hours),
+        'available_hours': float(available_hours)
+    }
+
 class ProjectListCreateAPIView(generics.ListCreateAPIView):
-    serializer_class   = ProjectSerializer
+    serializer_class = ProjectSerializer
     permission_classes = [IsAuthenticated]
+    
     def get_queryset(self):
-        qs = Project.objects.all()
+        qs = Project.objects.all().select_related('contract').order_by('contract__client_name', 'name')
         cid = self.request.query_params.get("contract")
         if cid and cid.isdigit():
             qs = qs.filter(contract_id=int(cid))
         return qs
+    
+    def list(self, request, *args, **kwargs):
+        queryset = self.get_queryset()
+        projects_data = []
+        
+        for project in queryset:
+            hours_info = calculate_available_hours(project)
+            project_data = {
+                'id': project.id,
+                'name': project.name,
+                'description': project.description,
+                'contract': project.contract.id,
+                'contract_name': project.contract.contract_name,
+                'client_name': project.contract.client_name,
+                'created_at': project.created_at,
+                'updated_at': project.updated_at,
+                'package_hours': hours_info
+            }
+            projects_data.append(project_data)
+        
+        return Response(projects_data)
+    
     def perform_create(self, serializer):
         serializer.save(owner=self.request.user)
 
 class ProjectRetrieveUpdateDestroyAPIView(generics.RetrieveUpdateDestroyAPIView):
-    queryset         = Project.objects.all()
+    queryset = Project.objects.all().select_related('contract')
     serializer_class = ProjectSerializer
     permission_classes = [IsAuthenticated]
+    
+    def retrieve(self, request, *args, **kwargs):
+        instance = self.get_object()
+        serializer = self.get_serializer(instance)
+        
+        # Calcular horas de paquetes
+        hours_info = calculate_available_hours(instance)
+        
+        # Obtener tickets asociados
+        tickets = Ticket.objects.filter(project=instance).select_related('assigned_user').prefetch_related('worklogs')
+        tickets_data = []
+        for ticket in tickets:
+            total_hours = sum(worklog.hours_logged for worklog in ticket.worklogs.all())
+            tickets_data.append({
+                'ticket_id': ticket.ticket_id,
+                'subject': ticket.subject,
+                'status': ticket.status,
+                'assigned_user_name': ticket.assigned_user.username if ticket.assigned_user else 'Sin asignar',
+                'requester': ticket.requester,
+                'total_hours': float(total_hours),
+                'created_at': ticket.created_at,
+            })
+        
+        # Obtener paquetes asociados
+        packages = Package.objects.filter(package_projects__project=instance)
+        packages_data = []
+        today = timezone.now().date()
+        
+        for package in packages:
+            is_active = package.start_date <= today <= package.end_date
+            packages_data.append({
+                'id': package.id,
+                'package_name': package.package_name,
+                'total_hours': float(package.total_hours),
+                'start_date': package.start_date,
+                'end_date': package.end_date,
+                'is_active': is_active
+            })
+        
+        data = serializer.data
+        data['package_hours'] = hours_info
+        data['tickets'] = tickets_data
+        data['packages'] = packages_data
+        
+        return Response(data)
 
 class PackageListCreateAPIView(generics.ListCreateAPIView):
     serializer_class = PackageSerializer
@@ -162,7 +277,6 @@ class TicketListCreateAPIView(generics.ListCreateAPIView):
         return qs.order_by('-created_at')
     
     def perform_create(self, serializer):
-        # El assigned_user puede ser None, no lo establecemos por defecto
         serializer.save(owner=self.request.user)
 
 class TicketRetrieveUpdateDestroyAPIView(generics.RetrieveUpdateDestroyAPIView):
@@ -180,12 +294,41 @@ def get_users_for_assignment(request):
     except Exception as e:
         return Response({'error': str(e)}, status=500)
 
+def parse_time_input(time_str):
+    """Convierte formato HH:MM a decimal de horas"""
+    if not time_str:
+        return 0
+    
+    # Si ya es un número decimal, devolverlo
+    try:
+        return float(time_str)
+    except ValueError:
+        pass
+    
+    # Parsear formato HH:MM
+    time_pattern = re.match(r'^(\d{1,2}):(\d{2})$', time_str.strip())
+    if time_pattern:
+        hours = int(time_pattern.group(1))
+        minutes = int(time_pattern.group(2))
+        return hours + (minutes / 60.0)
+    
+    raise ValueError("Formato de tiempo inválido. Use HH:MM o decimal.")
+
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 def create_worklog(request, ticket_id):
     try:
         ticket = Ticket.objects.get(ticket_id=ticket_id)
-        serializer = WorklogCreateSerializer(data=request.data, context={'ticket': ticket})
+        
+        # Procesar el formato de horas
+        data = request.data.copy()
+        if 'hours_logged' in data:
+            try:
+                data['hours_logged'] = parse_time_input(data['hours_logged'])
+            except ValueError as e:
+                return Response({'hours_logged': [str(e)]}, status=status.HTTP_400_BAD_REQUEST)
+        
+        serializer = WorklogCreateSerializer(data=data, context={'ticket': ticket})
         
         if serializer.is_valid():
             serializer.save()
