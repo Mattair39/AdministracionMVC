@@ -85,31 +85,18 @@ def calculate_available_hours(project):
         total=Sum('total_hours')
     )['total'] or 0
     
-    # CORRECCIÓN: Calcular las horas consumidas UNA SOLA VEZ por proyecto
-    # No por cada paquete, sino el total de horas consumidas en el proyecto
-    # dentro del rango de fechas que cubren TODOS los paquetes activos
+    # Calcular horas consumidas de TODOS los worklogs del proyecto (sin filtro de fechas)
+    consumed_hours = Worklog.objects.filter(
+        ticket__project=project
+    ).aggregate(total=Sum('hours_logged'))['total'] or 0
     
-    if active_packages.exists():
-        # Obtener el rango de fechas mínimo y máximo de todos los paquetes activos
-        date_ranges = active_packages.values_list('start_date', 'end_date')
-        min_start_date = min(date_range[0] for date_range in date_ranges)
-        max_end_date = max(date_range[1] for date_range in date_ranges)
-        
-        # Calcular horas consumidas en el proyecto dentro del rango total
-        consumed_hours = Worklog.objects.filter(
-            ticket__project=project,
-            work_date__date__gte=min_start_date,
-            work_date__date__lte=max_end_date
-        ).aggregate(total=Sum('hours_logged'))['total'] or 0
-    else:
-        consumed_hours = 0
-    
-    available_hours = total_package_hours - consumed_hours
+    # Las horas disponibles son las del paquete MENOS las consumidas
+    available_hours = max(0, total_package_hours - consumed_hours)
     
     return {
         'total_package_hours': float(total_package_hours),
         'consumed_hours': float(consumed_hours),
-        'available_hours': float(available_hours)
+        'available_hours': float(available_hours)  # Esto debe ser 0 si se consumieron todas
     }
 
 class ProjectListCreateAPIView(generics.ListCreateAPIView):
@@ -346,3 +333,62 @@ def delete_worklog(request, worklog_id):
         return Response({'success': True}, status=status.HTTP_204_NO_CONTENT)
     except Worklog.DoesNotExist:
         return Response({'error': 'Worklog no encontrado'}, status=404)
+
+# ============= NUEVAS VISTAS PARA ALERTAS DE HORAS =============
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def get_project_hours_info(request, project_id):
+    """Obtiene información de horas disponibles y consumidas del proyecto"""
+    try:
+        project = Project.objects.get(id=project_id)
+        hours_info = project.get_hours_info()
+        return Response(hours_info)
+    except Project.DoesNotExist:
+        return Response({'error': 'Proyecto no encontrado'}, status=404)
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def check_project_package_coverage(request, project_id):
+    """Verifica cobertura de paquetes para una fecha específica"""
+    try:
+        project = Project.objects.get(id=project_id)
+        work_date = request.query_params.get('work_date')
+        
+        if not work_date:
+            return Response(
+                {'error': 'work_date parameter is required'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        coverage_info = project.check_package_coverage(work_date)
+        return Response(coverage_info)
+    except Project.DoesNotExist:
+        return Response({'error': 'Proyecto no encontrado'}, status=404)
+    except ValueError as e:
+        return Response(
+            {'error': f'Invalid date format: {str(e)}'}, 
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def get_projects_hours_alerts(request):
+    """Obtiene alertas de horas para múltiples proyectos"""
+    project_ids = request.data.get('project_ids', [])
+    
+    if not project_ids:
+        return Response(
+            {'error': 'project_ids list is required'}, 
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    
+    alerts = {}
+    projects = Project.objects.filter(id__in=project_ids)
+    
+    for project in projects:
+        alert = project.get_hours_alert()
+        if alert:
+            alerts[project.id] = alert
+    
+    return Response(alerts) 

@@ -18,6 +18,9 @@ from .views import (
     get_users_for_assignment,
     create_worklog,
     delete_worklog,
+    get_project_hours_info,
+    check_project_package_coverage,
+    get_projects_hours_alerts,
 )
 
 urlpatterns = [
@@ -43,4 +46,7 @@ urlpatterns = [
     path("users/", get_users_for_assignment, name="users-list"),
     path("tickets/<int:ticket_id>/worklogs/", create_worklog, name="create-worklog"),
     path("worklogs/<int:worklog_id>/", delete_worklog, name="delete-worklog"),
+    path("projects/<int:project_id>/hours-info/", get_project_hours_info, name="project-hours-info"),
+    path("projects/<int:project_id>/package-coverage/", check_project_package_coverage, name="project-package-coverage"),
+    path("projects/hours-alerts/", get_projects_hours_alerts, name="projects-hours-alerts"),
 ]

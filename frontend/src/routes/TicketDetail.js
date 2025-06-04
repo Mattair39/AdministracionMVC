@@ -2,13 +2,15 @@ import React, { useState, useEffect } from "react";
 import {
   Box, Flex, Heading, Button, IconButton, Spinner, Select,
   Tabs, TabList, TabPanels, Tab, TabPanel,
-  Table, Thead, Tbody, Tr, Th, Td, Input, Textarea
+  Table, Thead, Tbody, Tr, Th, Td, Input, Textarea,
+  Alert, AlertIcon, AlertDescription
 } from "@chakra-ui/react";
 import { DeleteIcon } from "@chakra-ui/icons";
 import { useParams, useNavigate } from "react-router-dom";
 import {
   get_ticket, update_ticket,
-  get_users, create_worklog, delete_worklog
+  get_users, create_worklog, delete_worklog,
+  get_project_hours_info
 } from "../endpoints/api";
 
 export default function TicketDetail() {
@@ -17,6 +19,8 @@ export default function TicketDetail() {
   const [ticket, setTicket] = useState(null);
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
+  // NUEVO: Estado para la alerta de horas
+  const [hoursAlert, setHoursAlert] = useState(null);
   const [worklogForm, setWorklogForm] = useState({
     work_date: new Date().toISOString().slice(0, 16),
     hours_logged: '',
@@ -39,6 +43,11 @@ export default function TicketDetail() {
         if (usersArray.length > 0) {
           setWorklogForm(prev => ({ ...prev, user: usersArray[0].id }));
         }
+
+        // NUEVO: Cargar alerta de horas si hay proyecto
+        if (ticketData && ticketData.project) {
+          await loadHoursAlert(ticketData.project);
+        }
       } catch (error) {
         console.error('Error loading data:', error);
         setUsers([]);
@@ -51,6 +60,41 @@ export default function TicketDetail() {
       loadData();
     }
   }, [ticketId]);
+
+  // NUEVA FUNCIÓN: Cargar alerta de horas
+  const loadHoursAlert = async (projectId) => {
+    try {
+      const hoursData = await get_project_hours_info(projectId);
+      
+      if (hoursData.available_hours > 0) {
+        const percentage = (hoursData.consumed_hours / hoursData.available_hours) * 100;
+        
+        if (percentage >= 100) {
+          setHoursAlert({
+            type: 'error',
+            message: `Las horas de soporte han sido consumidas completamente (${hoursData.consumed_hours.toFixed(2)}h/${hoursData.available_hours.toFixed(2)}h)`
+          });
+        } else if (percentage >= 85) {
+          setHoursAlert({
+            type: 'warning',
+            message: `Se ha consumido el ${percentage.toFixed(1)}% de las horas de soporte disponibles (${hoursData.consumed_hours.toFixed(2)}h/${hoursData.available_hours.toFixed(2)}h)`
+          });
+        } else {
+          setHoursAlert(null);
+        }
+      } else if (hoursData.consumed_hours > 0 && hoursData.available_hours === 0) {
+        setHoursAlert({
+          type: 'info',
+          message: `Se han registrado ${hoursData.consumed_hours.toFixed(2)}h sin paquetes de horas disponibles`
+        });
+      } else {
+        setHoursAlert(null);
+      }
+    } catch (error) {
+      console.error('Error loading hours alert:', error);
+      setHoursAlert(null);
+    }
+  };
 
   if (loading) return <Spinner color="teal" />;
   if (!ticket) return <div>Error cargando ticket</div>;
@@ -92,12 +136,6 @@ export default function TicketDetail() {
     return timeRegex.test(timeStr);
   };
 
-  // Función para convertir HH:MM a decimal
-  const timeToDecimal = (timeStr) => {
-    const [hours, minutes] = timeStr.split(':').map(Number);
-    return hours + (minutes / 60);
-  };
-
   const addWorklog = async () => {
     if (!worklogForm.hours_logged || !worklogForm.description) return;
     
@@ -108,7 +146,6 @@ export default function TicketDetail() {
     }
     
     try {
-      // El backend ahora puede manejar formato HH:MM directamente
       await create_worklog(ticketId, worklogForm);
       const updatedTicket = await get_ticket(ticketId);
       setTicket(updatedTicket);
@@ -118,6 +155,11 @@ export default function TicketDetail() {
         description: '',
         user: users.length > 0 ? users[0].id : ''
       });
+
+      // NUEVO: Actualizar alerta después de agregar worklog
+      if (updatedTicket && updatedTicket.project) {
+        await loadHoursAlert(updatedTicket.project);
+      }
     } catch (error) {
       console.error('Error creating worklog:', error);
       if (error.response?.data?.hours_logged) {
@@ -131,6 +173,11 @@ export default function TicketDetail() {
       await delete_worklog(worklogId);
       const updatedTicket = await get_ticket(ticketId);
       setTicket(updatedTicket);
+
+      // NUEVO: Actualizar alerta después de eliminar worklog
+      if (updatedTicket && updatedTicket.project) {
+        await loadHoursAlert(updatedTicket.project);
+      }
     } catch (error) {
       console.error('Error deleting worklog:', error);
     }
@@ -142,6 +189,25 @@ export default function TicketDetail() {
         <Heading size="lg">Ticket #{ticket.ticket_id} - {ticket.subject}</Heading>
         <Button onClick={() => nav(-1)} colorScheme="teal">Volver</Button>
       </Flex>
+
+      {/* NUEVA SECCIÓN: Alerta de horas - Solo se muestra si existe */}
+      {hoursAlert && (
+        <Alert 
+          status={hoursAlert.type}
+          variant="left-accent"
+          mb={4}
+          rounded="md"
+          fontSize="sm"
+          bg={hoursAlert.type === 'error' ? 'red.900' : hoursAlert.type === 'warning' ? 'orange.900' : 'blue.900'}
+          borderColor={hoursAlert.type === 'error' ? 'red.500' : hoursAlert.type === 'warning' ? 'orange.500' : 'blue.500'}
+          color="white"
+        >
+          <AlertIcon color="white" />
+          <AlertDescription color="white" fontWeight="medium">
+            ¡Atención! {hoursAlert.message}
+          </AlertDescription>
+        </Alert>
+      )}
 
       <Flex mb={6} gap={4}>
         <Box bg="orange.500" px={3} py={1} rounded="md" color="white" fontSize="sm">

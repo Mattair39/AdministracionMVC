@@ -410,3 +410,54 @@ export const delete_worklog = async (worklogId) => {
     return refreshed !== false;
   }
 };
+
+// ============= ALERTAS DE HORAS =============
+// Obtener información de horas de un proyecto específico
+export const get_project_hours_info = async (projectId) => {
+  try {
+    const { data } = await axios.get(`${PROJECTS_URL}${projectId}/hours-info/`, { 
+      withCredentials: true 
+    });
+    return data;
+  } catch (e) {
+    return call_refresh(e, () =>
+      axios.get(`${PROJECTS_URL}${projectId}/hours-info/`, { withCredentials: true })
+    );
+  }
+};
+
+// Verificar cobertura de paquetes para una fecha específica
+export const check_package_coverage = async (projectId, workDate) => {
+  try {
+    const { data } = await axios.get(`${PROJECTS_URL}${projectId}/package-coverage/`, {
+      params: { work_date: workDate },
+      withCredentials: true
+    });
+    return data;
+  } catch (e) {
+    return call_refresh(e, () =>
+      axios.get(`${PROJECTS_URL}${projectId}/package-coverage/`, {
+        params: { work_date: workDate },
+        withCredentials: true
+      })
+    );
+  }
+};
+
+// Obtener alertas de horas para múltiples proyectos (para TicketsList)
+export const get_projects_hours_alerts = async (projectIds) => {
+  try {
+    const { data } = await axios.post(`${BASE_URL}projects/hours-alerts/`, {
+      project_ids: projectIds
+    }, { withCredentials: true });
+    return data;
+  } catch (e) {
+    const refreshed = await call_refresh(e, () =>
+      axios.post(`${BASE_URL}projects/hours-alerts/`, {
+        project_ids: projectIds
+      }, { withCredentials: true })
+    );
+    if (refreshed) return refreshed;
+    throw e;
+  }
+};
