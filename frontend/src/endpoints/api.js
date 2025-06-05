@@ -4,17 +4,17 @@ const BASE_URL = process.env.REACT_APP_API_URL
   ? process.env.REACT_APP_API_URL.replace(/\/+$/, "") + "/api/"
   : "http://localhost:8000/api/";
 
-const LOGIN_URL     = `${BASE_URL}token/`;
-const REFRESH_URL   = `${BASE_URL}token/refresh/`;
+const LOGIN_URL = `${BASE_URL}token/`;
+const REFRESH_URL = `${BASE_URL}token/refresh/`;
 const CONTRACTS_URL = `${BASE_URL}contracts/`;
-const PROJECTS_URL  = `${BASE_URL}projects/`;
+const PROJECTS_URL = `${BASE_URL}projects/`;
 const PACKAGES_URL = `${BASE_URL}packages/`;
 const PACKAGE_WIZARD_URL = `${BASE_URL}packages/wizard/`;
-const TICKETS_URL  = `${BASE_URL}tickets/`;
+const TICKETS_URL = `${BASE_URL}tickets/`;
 const USERS_URL = `${BASE_URL}users/`;
-const LOGOUT_URL    = `${BASE_URL}logout/`;
-const AUTH_URL      = `${BASE_URL}authenticated/`;
-const REGISTER_URL  = `${BASE_URL}register/`;
+const LOGOUT_URL = `${BASE_URL}logout/`;
+const AUTH_URL = `${BASE_URL}authenticated/`;
+const REGISTER_URL = `${BASE_URL}register/`;
 
 const call_refresh = async (error, fn) => {
   if (error.response?.status === 401) {

@@ -16,23 +16,24 @@ from rest_framework import status
 from datetime import datetime, time
 import re
 
-class CustomTokenObtainPairView(TokenObtainPairView):
+
+class CustomTokenObtainPairView(TokenObtainPairView): # Extiende la vista estándar de JWT para implementar autenticación basada en cookies HTTP-only.
     def post(self, request, *args, **kwargs):
         resp = super().post(request, *args, **kwargs)
-        tokens = resp.data
+        tokens = resp.data # Valida Credenciales y devuelve access y refresh tokens.
         samesite, secure = ("Lax", False) if settings.DEBUG else ("None", True)
         res = Response({"success": True})
-        res.set_cookie("access_token",  tokens["access"], httponly=True, secure=secure, samesite=samesite, path="/")
+        res.set_cookie("access_token",  tokens["access"], httponly=True, secure=secure, samesite=samesite, path="/") # Crea cookies seguras
         res.set_cookie("refresh_token", tokens["refresh"], httponly=True, secure=secure, samesite=samesite, path="/")
         return res
 
-class CustomRefreshTokenView(TokenRefreshView):
+class CustomRefreshTokenView(TokenRefreshView): # Renueva el access token usando el refresh token almacenado en cookies.
     def post(self, request, *args, **kwargs):
         request.data["refresh"] = request.COOKIES.get("refresh_token")
-        resp = super().post(request, *args, **kwargs)
+        resp = super().post(request, *args, **kwargs) # Inyecta en request
         tok = resp.data
         samesite, secure = ("Lax", False) if settings.DEBUG else ("None", True)
-        res = Response({"refreshed": True})
+        res = Response({"refreshed": True}) # Renueva el token
         res.set_cookie("access_token", tok.get("access"), httponly=True, secure=secure, samesite=samesite, path="/")
         return res
 
@@ -54,7 +55,7 @@ def register(request):
     ser = UserRegistrationSerializer(data=request.data)
     if ser.is_valid():
         ser.save()
-        return Response(ser.data)
+        return Response(ser.data) # Respuesta con datos del usuario.
     return Response(ser.errors)
 
 class ContractListCreateAPIView(generics.ListCreateAPIView):
@@ -90,13 +91,13 @@ def calculate_available_hours(project):
         ticket__project=project
     ).aggregate(total=Sum('hours_logged'))['total'] or 0
     
-    # Las horas disponibles son las del paquete MENOS las consumidas
+    # Las horas disponibles son las del paquete menos las consumidas
     available_hours = max(0, total_package_hours - consumed_hours)
     
     return {
         'total_package_hours': float(total_package_hours),
         'consumed_hours': float(consumed_hours),
-        'available_hours': float(available_hours)  # Esto debe ser 0 si se consumieron todas
+        'available_hours': float(available_hours)  
     }
 
 class ProjectListCreateAPIView(generics.ListCreateAPIView):
@@ -286,7 +287,7 @@ def parse_time_input(time_str):
     if not time_str:
         return 0
     
-    # Si ya es un número decimal, devolverlo
+    # Si es decimal, se devuelve
     try:
         return float(time_str)
     except ValueError:
@@ -334,7 +335,7 @@ def delete_worklog(request, worklog_id):
     except Worklog.DoesNotExist:
         return Response({'error': 'Worklog no encontrado'}, status=404)
 
-# ============= NUEVAS VISTAS PARA ALERTAS DE HORAS =============
+# Para alerta de horas
 
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])

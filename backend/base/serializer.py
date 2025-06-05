@@ -5,15 +5,17 @@ from django.core.exceptions import ValidationError as DjangoValidationError
 from datetime import datetime, date, timedelta
 import calendar
 
+# Los serializadores los utilizo para transformar los modelos de Django en JSON y viceversa.
+
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
-        model  = User
+        model = User
         fields = ["username"]
 
 class UserRegistrationSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True)
     class Meta:
-        model  = User
+        model = User
         fields = ["username", "email", "password"]
 
     def create(self, validated_data):
@@ -23,10 +25,10 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
         return user
 
 class ContractSerializer(serializers.ModelSerializer):
-    owner = UserSerializer(read_only=True)
+    owner = UserSerializer(read_only=True) # Para anidar este serializer (Mostrar el nombre del propeitario del contrato).
 
     class Meta:
-        model  = Contract
+        model = Contract
         fields = [
             "id", "contract_name", "client_name",
             "start_date", "end_date",
@@ -34,15 +36,15 @@ class ContractSerializer(serializers.ModelSerializer):
         ]
 
     def validate(self, data):
-        sd = data.get("start_date", getattr(self.instance, "start_date", None))
-        ed = data.get("end_date",   getattr(self.instance, "end_date", None))
+        sd = data.get("start_date", getattr(self.instance, "start_date", None)) # Si estamos editando, toma el valor actual del contrato.
+        ed = data.get("end_date", getattr(self.instance, "end_date", None))
         if sd and ed and ed < sd:
             raise serializers.ValidationError({"end_date": "La fecha de fin no puede ser anterior a la fecha de inicio."})
         return data
 
     def create(self, validated_data):
         obj = Contract(**validated_data)
-        obj.clean()
+        obj.clean() # Para llamar mis validaciones de models.py.
         obj.save()
         return obj
 
@@ -56,7 +58,7 @@ class ContractSerializer(serializers.ModelSerializer):
 class ProjectSerializer(serializers.ModelSerializer):
     contract_name = serializers.CharField(source="contract.contract_name", read_only=True)
     contract = serializers.PrimaryKeyRelatedField(queryset=Contract.objects.all())
-
+    # queryset para validar que el ID exista en la base de datos.
     class Meta:
         model = Project
         fields = [
@@ -86,7 +88,7 @@ class PackageProjectSerializer(serializers.ModelSerializer):
 
 class PackageSerializer(serializers.ModelSerializer):
     contract_name = serializers.CharField(source="contract.contract_name", read_only=True)
-    projects = PackageProjectSerializer(source="package_projects", many=True, read_only=True)
+    projects = PackageProjectSerializer(source="package_projects", many=True, read_only=True) # Anidado que usa la relación inversa con paquetes.
     project_ids = serializers.ListField(
         child=serializers.IntegerField(), 
         write_only=True, 
@@ -108,12 +110,12 @@ class PackageSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         project_ids = validated_data.pop('project_ids')
-        package = Package.objects.create(**validated_data)
+        package = Package.objects.create(**validated_data) # Crea el paquete con los datos validados/restantes.
         
         for project_id in project_ids:
             try:
                 project = Project.objects.get(id=project_id, contract=package.contract)
-                PackageProject.objects.create(package=package, project=project)
+                PackageProject.objects.create(package=package, project=project) # Crea la relación entre el paquete y el proyecto.
             except Project.DoesNotExist:
                 continue
                 
@@ -122,7 +124,7 @@ class PackageSerializer(serializers.ModelSerializer):
     def update(self, instance, validated_data):
         project_ids = validated_data.pop('project_ids', None)
         
-        for attr, value in validated_data.items():
+        for attr, value in validated_data.items(): # Para setear/actualizar los campos validados del paquete.
             setattr(instance, attr, value)
         instance.save()
         
@@ -138,7 +140,7 @@ class PackageSerializer(serializers.ModelSerializer):
         
         return instance
 
-class PackageWizardSerializer(serializers.Serializer):
+class PackageWizardSerializer(serializers.Serializer): # No está basado en un modelo especifico. 
     contract_id = serializers.IntegerField()
     package_name = serializers.CharField(max_length=120, required=False, allow_blank=True)
     total_hours = serializers.DecimalField(max_digits=8, decimal_places=2)
@@ -161,7 +163,7 @@ class PackageWizardSerializer(serializers.Serializer):
         if not data['project_ids']:
             raise serializers.ValidationError({"project_ids": "Debe seleccionar al menos un proyecto."})
         
-        # Solo validar nombre si NO está segmentado por meses
+        # Solo validar nombre si no se encuentra segmentado por meses.
         if not data['segment_by_months'] and not data.get('package_name', '').strip():
             raise serializers.ValidationError({"package_name": "El nombre del paquete es requerido."})
         
@@ -171,7 +173,7 @@ class PackageWizardSerializer(serializers.Serializer):
         contract = Contract.objects.get(id=validated_data['contract_id'])
         created_packages = []
         
-        if not validated_data['segment_by_months']:
+        if not validated_data['segment_by_months']: # Para crear un solo paquete
             package = Package.objects.create(
                 contract=contract,
                 package_name=validated_data['package_name'],
@@ -190,7 +192,7 @@ class PackageWizardSerializer(serializers.Serializer):
                     continue
             
             created_packages.append(package)
-        else:
+        else: # Para crear paquetes segmentados
             packages = self._create_segmented_packages(validated_data, contract)
             created_packages.extend(packages)
         
@@ -204,7 +206,7 @@ class PackageWizardSerializer(serializers.Serializer):
         # Determinar tipo de nomenclatura
         is_full_month = (start_date.day == 1 and end_date.day >= 28)
         
-        # Primero, calcular cuántos paquetes vamos a crear
+        # Para calcular cuántos paquetes se van a crear
         packages_info = []
         current_date = start_date
         
@@ -252,7 +254,7 @@ class PackageWizardSerializer(serializers.Serializer):
             else:
                 current_date = pkg_end_date + timedelta(days=1)
             
-            if len(packages_info) > 50:  # Límite de seguridad
+            if len(packages_info) > 50:  # Para dar un limite 
                 break
         
         # Calcular horas por paquete (EQUITATIVAS)
@@ -264,7 +266,7 @@ class PackageWizardSerializer(serializers.Serializer):
         
         # Crear los paquetes con horas equitativas
         packages = []
-        for i, pkg_info in enumerate(packages_info):
+        for i, pkg_info in enumerate(packages_info): # Agrega un indice a cada elemento
             pkg_start = pkg_info['start_date']
             pkg_end = pkg_info['end_date']
             
@@ -322,7 +324,6 @@ class WorklogSerializer(serializers.ModelSerializer):
 
 class TicketSerializer(serializers.ModelSerializer):
     project_name = serializers.CharField(source="project.name", read_only=True)
-    # Cambio: assigned_user_name puede ser None, manejarlo adecuadamente
     assigned_user_name = serializers.SerializerMethodField()
     worklogs = WorklogSerializer(many=True, read_only=True)
     total_hours = serializers.SerializerMethodField()

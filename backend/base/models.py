@@ -1,4 +1,4 @@
-from django.db import models
+from django.db import models # Framework ORM de Django para definir modelos de base de datos.
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 
@@ -11,7 +11,7 @@ class Contract(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
     owner = models.ForeignKey(User, on_delete=models.CASCADE, related_name='contracts')
 
-    def clean(self):
+    def clean(self): # Django lo llama antes de guardar.
         if self.end_date < self.start_date:
             raise ValidationError({"end_date": "La fecha de fin no puede ser anterior a la fecha de inicio."})
 
@@ -35,26 +35,26 @@ class Project(models.Model):
         return self.name
 
     def get_hours_info(self):
-        """Obtiene información de horas disponibles y consumidas del proyecto"""
+        # Para obtener información de horas disponibles y consumidas del proyecto.
         from django.utils import timezone
         from django.db.models import Sum
         from decimal import Decimal
         
         today = timezone.now().date()
         
-        # Obtener paquetes activos (que incluyan la fecha actual)
+        # Obtiene los paquetes activos (que incluyan la fecha actual).
         active_packages = Package.objects.filter(
             package_projects__project=self,
             start_date__lte=today,
             end_date__gte=today
         )
         
-        # Calcular horas disponibles (suma de paquetes activos)
+        # Calcular horas disponibles (Suma de paquetes activos).
         available_hours = active_packages.aggregate(
             total=Sum('total_hours')
         )['total'] or Decimal('0.00')
         
-        # Calcular horas consumidas (suma de worklogs de todos los tickets del proyecto)
+        # Calcular horas consumidas (Suma de worklogs de todos los tickets del proyecto)
         consumed_hours = Worklog.objects.filter(
             ticket__project=self
         ).aggregate(
@@ -69,11 +69,11 @@ class Project(models.Model):
         }
 
     def check_package_coverage(self, work_date):
-        """Verifica si hay paquetes que cubran una fecha específica"""
+        # Verifica si hay paquetes que cubran una fecha específica.
         from datetime import datetime
         
         if isinstance(work_date, str):
-            # Parsear fecha ISO con posible timezone
+            # Para convertir una fecha en formato ISO a un objeto date.
             work_date = datetime.fromisoformat(work_date.replace('Z', '+00:00')).date()
         
         covering_packages = Package.objects.filter(
@@ -98,7 +98,7 @@ class Project(models.Model):
         }
 
     def get_hours_alert(self):
-        """Obtiene el tipo de alerta según las reglas del negocio"""
+        # Obtiene el tipo de alerta (85% o 100% de horas consumidas)
         hours_info = self.get_hours_info()
         
         if hours_info['available_hours'] > 0:

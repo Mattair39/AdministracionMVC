@@ -22,17 +22,17 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
-    "corsheaders",
-    "rest_framework",
-    "rest_framework_simplejwt",
+    "corsheaders", # Permite CORS para frontend (Para comunicar mi frontend en React con el backend).
+    "rest_framework", # (Transformación a un API REST).
+    "rest_framework_simplejwt",# JWT - Json Web Tokens para autenticación.
     "base",
 ]
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
-    "whitenoise.middleware.WhiteNoiseMiddleware",
+    "whitenoise.middleware.WhiteNoiseMiddleware", # (Sirve archivos estaticos en producción).
     "django.contrib.sessions.middleware.SessionMiddleware",
-    "corsheaders.middleware.CorsMiddleware",
+    "corsheaders.middleware.CorsMiddleware", # (Permite requests de distintos dominios).
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
@@ -80,13 +80,13 @@ USE_TZ = True
 
 CORS_ALLOWED_ORIGINS = os.environ.get(
     "CORS_ALLOWED_ORIGINS",
-    "http://localhost:3000,https://administracionmvc-static.onrender.com"
+    "http://localhost:3000,https://administracionmvc-static.onrender.com" # (React: Puerto 3000) y (Backend: Puesto 8000)
 ).split(",")
-CORS_ALLOW_CREDENTIALS = True
+CORS_ALLOW_CREDENTIALS = True # (Permite envio de cookies entre dominios).
 
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": (
-        "base.authentication.CookiesJWTAuthentication",
+        "base.authentication.CookiesJWTAuthentication", # (Como se autentica cada request - JWT con cookies).
     ),
     "DEFAULT_PERMISSION_CLASSES": [
         "rest_framework.permissions.IsAuthenticated",
