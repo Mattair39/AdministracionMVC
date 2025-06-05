@@ -1,4 +1,4 @@
-# Proyescto Core MVC  – Gestión de Paquetes y Alertas de Horas, Contratos y Proyectos 
+# Proyecto Core MVC  – Gestión de Paquetes y Alertas de Horas, Contratos y Proyectos 
 
 Aplicación web con **autenticación JWT** (almacenado en cookies _HttpOnly_) y CRUD relacionado de **Contratos** y **Proyectos**, desarrollada bajo el patrón **MVC** con **Django + Django REST Framework** en el backend y **React + Chakra UI** en el frontend. Contempla la administración del sistema mediante la aplicación de validaciones para elementos sensibles del Core y relaciona los elementos de las tablas de manera orgánica y lo muestra mediante dropdowns y Tabs relacionados.
 
