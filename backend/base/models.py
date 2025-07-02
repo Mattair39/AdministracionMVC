@@ -1,4 +1,4 @@
-from django.db import models # Framework ORM de Django para definir modelos de base de datos.
+from django.db import models
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 
@@ -11,7 +11,7 @@ class Contract(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
     owner = models.ForeignKey(User, on_delete=models.CASCADE, related_name='contracts')
 
-    def clean(self): # Django lo llama antes de guardar.
+    def clean(self):
         if self.end_date < self.start_date:
             raise ValidationError({"end_date": "La fecha de fin no puede ser anterior a la fecha de inicio."})
 
@@ -35,26 +35,22 @@ class Project(models.Model):
         return self.name
 
     def get_hours_info(self):
-        # Para obtener información de horas disponibles y consumidas del proyecto.
         from django.utils import timezone
         from django.db.models import Sum
         from decimal import Decimal
         
         today = timezone.now().date()
         
-        # Obtiene los paquetes activos (que incluyan la fecha actual).
         active_packages = Package.objects.filter(
             package_projects__project=self,
             start_date__lte=today,
             end_date__gte=today
         )
         
-        # Calcular horas disponibles (Suma de paquetes activos).
         available_hours = active_packages.aggregate(
             total=Sum('total_hours')
         )['total'] or Decimal('0.00')
         
-        # Calcular horas consumidas (Suma de worklogs de todos los tickets del proyecto)
         consumed_hours = Worklog.objects.filter(
             ticket__project=self
         ).aggregate(
@@ -69,11 +65,9 @@ class Project(models.Model):
         }
 
     def check_package_coverage(self, work_date):
-        # Verifica si hay paquetes que cubran una fecha específica.
         from datetime import datetime
         
         if isinstance(work_date, str):
-            # Para convertir una fecha en formato ISO a un objeto date.
             work_date = datetime.fromisoformat(work_date.replace('Z', '+00:00')).date()
         
         covering_packages = Package.objects.filter(
@@ -98,7 +92,6 @@ class Project(models.Model):
         }
 
     def get_hours_alert(self):
-        # Obtiene el tipo de alerta (85% o 100% de horas consumidas)
         hours_info = self.get_hours_info()
         
         if hours_info['available_hours'] > 0:
@@ -125,23 +118,16 @@ class Project(models.Model):
         
         return None
 
-    # NUEVA FUNCIONALIDAD: Verificar y crear paquete adicional automáticamente
     def check_and_create_additional_package_if_needed(self, new_hours, work_date):
-        """
-        Verifica si agregar nuevas horas excede la capacidad disponible
-        y crea automáticamente un paquete adicional si es necesario
-        """
         from django.utils import timezone
         from decimal import Decimal
         from datetime import timedelta, datetime
         import math
         
-        # Obtener información actual de horas
         hours_info = self.get_hours_info()
         total_hours_after_add = hours_info['consumed_hours'] + float(new_hours)
         available_hours = hours_info['available_hours']
         
-        # Si no hay exceso, no hacer nada
         if total_hours_after_add <= available_hours:
             return {
                 'package_created': False,
@@ -149,46 +135,37 @@ class Project(models.Model):
                 'package': None
             }
         
-        # Calcular horas de exceso
         excess_hours = total_hours_after_add - available_hours
         
-        # Obtener el contrato del proyecto (correcto según tu estructura)
         contract = self.contract
         
-        # Convertir work_date a objeto date si es string
         if isinstance(work_date, str):
             work_date = datetime.fromisoformat(work_date.replace('Z', '+00:00')).date()
         
-        # Crear nombre del paquete adicional
         timestamp = datetime.now().strftime("%H%M%S")
         base_name = f"Paquete Adicional - {work_date.strftime('%d/%m/%Y')}"
         
-        # Verificar si ya existe y agregar contador si es necesario
         package_name = base_name
         counter = 1
         while Package.objects.filter(contract=contract, package_name=package_name).exists():
             package_name = f"{base_name} ({counter})"
             counter += 1
         
-        # Redondear las horas de exceso hacia arriba (mínimo 1 hora)
         package_hours = max(1.0, math.ceil(excess_hours))
         
-        # Crear el paquete adicional
-        # Duración: desde la fecha del trabajo hasta 30 días después
         start_date = work_date
         end_date = start_date + timedelta(days=30)
         
         additional_package = Package.objects.create(
-            contract=contract,  # Asociado al contrato (correcto)
+            contract=contract,
             package_name=package_name,
             total_hours=Decimal(str(package_hours)),
             start_date=start_date,
             end_date=end_date,
             is_segmented=False,
-            owner=self.owner  # Usar el mismo owner del proyecto
+            owner=self.owner
         )
         
-        # Asociar el paquete con este proyecto específico
         PackageProject.objects.create(
             package=additional_package,
             project=self
@@ -207,24 +184,17 @@ class Project(models.Model):
             }
         }
 
-    # NUEVA FUNCIONALIDAD: Alerta extendida con información de paquetes automáticos
     def get_hours_alert_with_auto_package_info(self, auto_package_info=None):
-        """
-        Versión extendida de get_hours_alert que incluye información sobre paquetes automáticos
-        """
         hours_info = self.get_hours_info()
         alert = self.get_hours_alert()
         
-        # Si se creó un paquete automático, modificar o crear alerta
         if auto_package_info and auto_package_info['package_created']:
             package_info = auto_package_info['package']
             
             if alert and alert['type'] == 'error':
-                # Modificar alerta existente para incluir info del paquete creado
                 alert['message'] += f" | Se ha creado automáticamente el paquete '{package_info['name']}' con {package_info['total_hours']}h adicionales"
                 alert['auto_package'] = package_info
             else:
-                # Crear nueva alerta informativa
                 alert = {
                     'type': 'success',
                     'message': f'Se ha creado automáticamente un paquete adicional: {package_info["name"]} ({package_info["total_hours"]}h) para cubrir el exceso de horas',
@@ -233,6 +203,22 @@ class Project(models.Model):
                 }
         
         return alert
+
+    def get_hours_calculator(self):
+        from .services.hours_calculator import HoursCalculatorService
+        return HoursCalculatorService(self)
+    
+    def get_hours_info_new(self):
+        calculator = self.get_hours_calculator()
+        return calculator.calculate_hours_summary()
+    
+    def has_available_hours(self):
+        calculator = self.get_hours_calculator()
+        return calculator.get_available_hours() > 0
+    
+    def get_hours_status(self):
+        calculator = self.get_hours_calculator()
+        return calculator.get_hours_status()
 
 class Package(models.Model):
     contract = models.ForeignKey(Contract, on_delete=models.CASCADE, related_name='packages')

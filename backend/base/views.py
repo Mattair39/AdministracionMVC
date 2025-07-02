@@ -12,6 +12,8 @@ from .serializer import (
     ContractSerializer, ProjectSerializer, UserRegistrationSerializer,
     PackageSerializer, PackageWizardSerializer, TicketSerializer, WorklogSerializer, WorklogCreateSerializer
 )
+# NUEVO: Importar el servicio de cálculo de horas para implementar SRP
+from .services.hours_calculator import HoursCalculatorService
 from rest_framework import status
 from datetime import datetime, time
 import re
@@ -70,35 +72,27 @@ class ContractRetrieveUpdateDestroyAPIView(generics.RetrieveUpdateDestroyAPIView
     serializer_class = ContractSerializer
     permission_classes = [IsAuthenticated]
 
+# FUNCIÓN WRAPPER: Mantiene compatibilidad con el código existente
+# Implementa el principio de Responsabilidad Única (SRP)
 def calculate_available_hours(project):
-    """Calcula las horas disponibles para un proyecto basado en paquetes vigentes"""
-    today = timezone.now().date()
+    """
+    Función wrapper para mantener compatibilidad con el código existente.
     
-    # Obtener paquetes vigentes (activos en la fecha actual)
-    active_packages = Package.objects.filter(
-        package_projects__project=project,
-        start_date__lte=today,
-        end_date__gte=today
-    )
+    NOTA: Esta función ahora delega al HoursCalculatorService para cumplir
+    con el principio de Responsabilidad Única (SRP). La lógica de cálculo
+    está encapsulada en una clase dedicada.
     
-    # Sumar las horas totales de los paquetes activos
-    total_package_hours = active_packages.aggregate(
-        total=Sum('total_hours')
-    )['total'] or 0
+    Args:
+        project: Instancia del modelo Project
     
-    # Calcular horas consumidas de TODOS los worklogs del proyecto (sin filtro de fechas)
-    consumed_hours = Worklog.objects.filter(
-        ticket__project=project
-    ).aggregate(total=Sum('hours_logged'))['total'] or 0
-    
-    # Las horas disponibles son las del paquete menos las consumidas
-    available_hours = max(0, total_package_hours - consumed_hours)
-    
-    return {
-        'total_package_hours': float(total_package_hours),
-        'consumed_hours': float(consumed_hours),
-        'available_hours': float(available_hours)  
-    }
+    Returns:
+        dict: Información de horas del proyecto
+            - total_package_hours: Horas totales de paquetes activos
+            - consumed_hours: Horas consumidas en worklogs
+            - available_hours: Horas disponibles (mínimo 0)
+    """
+    calculator = HoursCalculatorService(project)
+    return calculator.calculate_hours_summary()
 
 class ProjectListCreateAPIView(generics.ListCreateAPIView):
     serializer_class = ProjectSerializer
@@ -116,7 +110,11 @@ class ProjectListCreateAPIView(generics.ListCreateAPIView):
         projects_data = []
         
         for project in queryset:
-            hours_info = calculate_available_hours(project)
+            # CAMBIO: Usar directamente el servicio para mayor eficiencia y claridad
+            # Aplicación del principio SRP - el servicio se encarga únicamente del cálculo
+            calculator = HoursCalculatorService(project)
+            hours_info = calculator.calculate_hours_summary()
+            
             project_data = {
                 'id': project.id,
                 'name': project.name,
@@ -144,8 +142,10 @@ class ProjectRetrieveUpdateDestroyAPIView(generics.RetrieveUpdateDestroyAPIView)
         instance = self.get_object()
         serializer = self.get_serializer(instance)
         
-        # Calcular horas de paquetes
-        hours_info = calculate_available_hours(instance)
+        # CAMBIO: Usar directamente el servicio
+        # Aplicación del principio SRP - separación de responsabilidades
+        calculator = HoursCalculatorService(instance)
+        hours_info = calculator.calculate_hours_summary()
         
         # Obtener tickets asociados
         tickets = Ticket.objects.filter(project=instance).select_related('assigned_user').prefetch_related('worklogs')
@@ -370,7 +370,7 @@ def delete_worklog(request, worklog_id):
     except Worklog.DoesNotExist:
         return Response({'error': 'Worklog no encontrado'}, status=404)
 
-# Para alerta de horas
+# Para alerta de horas - USANDO EL MÉTODO EXISTENTE DEL MODELO
 
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
@@ -378,6 +378,8 @@ def get_project_hours_info(request, project_id):
     """Obtiene información de horas disponibles y consumidas del proyecto"""
     try:
         project = Project.objects.get(id=project_id)
+        # NOTA: Mantiene compatibilidad usando el método existente del modelo
+        # que internamente puede usar el servicio si se actualiza
         hours_info = project.get_hours_info()
         return Response(hours_info)
     except Project.DoesNotExist:
