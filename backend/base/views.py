@@ -302,6 +302,7 @@ def parse_time_input(time_str):
     
     raise ValueError("Formato de tiempo inválido. Use HH:MM o decimal.")
 
+# FUNCIÓN MODIFICADA: create_worklog con generación automática de paquetes
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 def create_worklog(request, ticket_id):
@@ -310,18 +311,52 @@ def create_worklog(request, ticket_id):
         
         # Procesar el formato de horas
         data = request.data.copy()
+        hours_to_add = 0
+        
         if 'hours_logged' in data:
             try:
-                data['hours_logged'] = parse_time_input(data['hours_logged'])
+                hours_to_add = parse_time_input(data['hours_logged'])
+                data['hours_logged'] = hours_to_add
             except ValueError as e:
                 return Response({'hours_logged': [str(e)]}, status=status.HTTP_400_BAD_REQUEST)
         
+        # NUEVA FUNCIONALIDAD: Verificar si se necesita crear paquete adicional
+        project = ticket.project
+        work_date = data.get('work_date')
+        
+        # Convertir work_date si es string
+        if isinstance(work_date, str):
+            try:
+                from datetime import datetime
+                work_date = datetime.fromisoformat(work_date.replace('Z', '+00:00')).date()
+            except:
+                work_date = timezone.now().date()
+        
+        # Verificar y crear paquete adicional si es necesario
+        auto_package_info = project.check_and_create_additional_package_if_needed(
+            hours_to_add, work_date
+        )
+        
+        # Crear el worklog normalmente
         serializer = WorklogCreateSerializer(data=data, context={'ticket': ticket})
         
         if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
+            worklog = serializer.save()
+            
+            # Preparar respuesta con información del paquete automático
+            response_data = serializer.data
+            
+            if auto_package_info['package_created']:
+                response_data['auto_package_created'] = {
+                    'message': f'Se ha creado automáticamente un paquete adicional para cubrir el exceso de {auto_package_info["excess_hours"]:.2f} horas',
+                    'package': auto_package_info['package'],
+                    'excess_hours': auto_package_info['excess_hours']
+                }
+            
+            return Response(response_data, status=status.HTTP_201_CREATED)
+        
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        
     except Ticket.DoesNotExist:
         return Response({'error': 'Ticket no encontrado'}, status=404)
 
@@ -392,4 +427,40 @@ def get_projects_hours_alerts(request):
         if alert:
             alerts[project.id] = alert
     
-    return Response(alerts) 
+    return Response(alerts)
+
+# NUEVA FUNCIÓN: Alerta extendida de horas con información de paquetes automáticos
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def get_project_hours_alert_extended(request, project_id):
+    """
+    Obtiene alerta de horas extendida que puede incluir información de paquetes automáticos
+    """
+    try:
+        project = Project.objects.get(id=project_id)
+        
+        # Verificar si hay parámetros de paquete automático en query params
+        auto_package_id = request.query_params.get('auto_package_id')
+        auto_package_info = None
+        
+        if auto_package_id:
+            try:
+                auto_package = Package.objects.get(id=auto_package_id)
+                auto_package_info = {
+                    'package_created': True,
+                    'package': {
+                        'id': auto_package.id,
+                        'name': auto_package.package_name,
+                        'total_hours': float(auto_package.total_hours),
+                        'start_date': auto_package.start_date.isoformat(),
+                        'end_date': auto_package.end_date.isoformat()
+                    }
+                }
+            except Package.DoesNotExist:
+                pass
+        
+        alert = project.get_hours_alert_with_auto_package_info(auto_package_info)
+        return Response(alert if alert else {})
+        
+    except Project.DoesNotExist:
+        return Response({'error': 'Proyecto no encontrado'}, status=404)

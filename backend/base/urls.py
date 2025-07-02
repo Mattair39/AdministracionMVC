@@ -21,6 +21,7 @@ from .views import (
     get_project_hours_info,
     check_project_package_coverage,
     get_projects_hours_alerts,
+    get_project_hours_alert_extended,  # NUEVA IMPORTACIÓN
 )
 
 urlpatterns = [
@@ -49,4 +50,7 @@ urlpatterns = [
     path("projects/<int:project_id>/hours-info/", get_project_hours_info, name="project-hours-info"),
     path("projects/<int:project_id>/package-coverage/", check_project_package_coverage, name="project-package-coverage"),
     path("projects/hours-alerts/", get_projects_hours_alerts, name="projects-hours-alerts"),
+    
+    # NUEVA RUTA: Para alertas extendidas con información de paquetes automáticos
+    path("projects/<int:project_id>/hours-alert-extended/", get_project_hours_alert_extended, name="project-hours-alert-extended"),
 ]

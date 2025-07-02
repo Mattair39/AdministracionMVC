@@ -3,9 +3,9 @@ import {
   Box, Flex, Heading, Button, IconButton, Spinner, Select,
   Tabs, TabList, TabPanels, Tab, TabPanel,
   Table, Thead, Tbody, Tr, Th, Td, Input, Textarea,
-  Alert, AlertIcon, AlertDescription
+  Alert, AlertIcon, AlertDescription, useToast
 } from "@chakra-ui/react";
-import { DeleteIcon } from "@chakra-ui/icons";
+import { DeleteIcon, CheckCircleIcon } from "@chakra-ui/icons";
 import { useParams, useNavigate } from "react-router-dom";
 import {
   get_ticket, update_ticket,
@@ -16,11 +16,15 @@ import {
 export default function TicketDetail() {
   const { ticketId } = useParams();
   const nav = useNavigate();
+  const toast = useToast();
   const [ticket, setTicket] = useState(null);
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
-  // NUEVO: Estado para la alerta de horas
+  
+  // Estados para alertas de horas
   const [hoursAlert, setHoursAlert] = useState(null);
+  const [autoPackageAlert, setAutoPackageAlert] = useState(null);
+  
   const [worklogForm, setWorklogForm] = useState({
     work_date: new Date().toISOString().slice(0, 16),
     hours_logged: '',
@@ -44,7 +48,7 @@ export default function TicketDetail() {
           setWorklogForm(prev => ({ ...prev, user: usersArray[0].id }));
         }
 
-        // NUEVO: Cargar alerta de horas si hay proyecto
+        // Cargar alerta de horas si hay proyecto
         if (ticketData && ticketData.project) {
           await loadHoursAlert(ticketData.project);
         }
@@ -61,7 +65,7 @@ export default function TicketDetail() {
     }
   }, [ticketId]);
 
-  // NUEVA FUNCIÓN: Cargar alerta de horas
+  // Función para cargar alerta de horas
   const loadHoursAlert = async (projectId) => {
     try {
       const hoursData = await get_project_hours_info(projectId);
@@ -136,6 +140,7 @@ export default function TicketDetail() {
     return timeRegex.test(timeStr);
   };
 
+  // FUNCIÓN ACTUALIZADA: addWorklog con manejo de paquetes automáticos
   const addWorklog = async () => {
     if (!worklogForm.hours_logged || !worklogForm.description) return;
     
@@ -146,7 +151,38 @@ export default function TicketDetail() {
     }
     
     try {
-      await create_worklog(ticketId, worklogForm);
+      // NUEVA: Usar create_worklog que ahora maneja paquetes automáticos
+      const response = await create_worklog(ticketId, worklogForm);
+      
+      // NUEVA: Verificar si se creó un paquete automático
+      if (response.auto_package_created) {
+        const packageInfo = response.auto_package_created;
+        
+        // Mostrar alerta de éxito con información del paquete
+        setAutoPackageAlert({
+          type: 'success',
+          message: packageInfo.message,
+          package: packageInfo.package,
+          excess_hours: packageInfo.excess_hours
+        });
+
+        // Mostrar toast de notificación
+        toast({
+          title: "🎉 Paquete Adicional Creado",
+          description: `Se ha creado automáticamente "${packageInfo.package.name}" con ${packageInfo.package.total_hours}h`,
+          status: "success",
+          duration: 8000,
+          isClosable: true,
+          position: "top-right"
+        });
+
+        // Auto-ocultar la alerta después de 15 segundos
+        setTimeout(() => {
+          setAutoPackageAlert(null);
+        }, 15000);
+      }
+      
+      // Actualizar el ticket y resetear el formulario
       const updatedTicket = await get_ticket(ticketId);
       setTicket(updatedTicket);
       setWorklogForm({
@@ -156,7 +192,7 @@ export default function TicketDetail() {
         user: users.length > 0 ? users[0].id : ''
       });
 
-      // NUEVO: Actualizar alerta después de agregar worklog
+      // Actualizar alerta de horas
       if (updatedTicket && updatedTicket.project) {
         await loadHoursAlert(updatedTicket.project);
       }
@@ -174,13 +210,17 @@ export default function TicketDetail() {
       const updatedTicket = await get_ticket(ticketId);
       setTicket(updatedTicket);
 
-      // NUEVO: Actualizar alerta después de eliminar worklog
+      // Actualizar alerta después de eliminar worklog
       if (updatedTicket && updatedTicket.project) {
         await loadHoursAlert(updatedTicket.project);
       }
     } catch (error) {
       console.error('Error deleting worklog:', error);
     }
+  };
+
+  const dismissAutoPackageAlert = () => {
+    setAutoPackageAlert(null);
   };
 
   return (
@@ -190,7 +230,46 @@ export default function TicketDetail() {
         <Button onClick={() => nav(-1)} colorScheme="teal">Volver</Button>
       </Flex>
 
-      {/* NUEVA SECCIÓN: Alerta de horas - Solo se muestra si existe */}
+      {/* NUEVA: Alerta de paquete automático creado */}
+      {autoPackageAlert && (
+        <Alert 
+          status="success"
+          variant="left-accent"
+          mb={4}
+          rounded="md"
+          fontSize="sm"
+          bg="green.900"
+          borderColor="green.500"
+          color="white"
+          position="relative"
+        >
+          <CheckCircleIcon color="green.400" mr={2} />
+          <Box flex="1">
+            <AlertDescription color="white" fontWeight="medium">
+              ✅ {autoPackageAlert.message}
+            </AlertDescription>
+            <Box mt={2} fontSize="xs" color="green.200">
+              📦 <strong>Paquete:</strong> {autoPackageAlert.package.name}<br/>
+              ⏱️ <strong>Duración:</strong> {autoPackageAlert.package.start_date} al {autoPackageAlert.package.end_date}<br/>
+              🕒 <strong>Horas de exceso cubiertas:</strong> {autoPackageAlert.excess_hours.toFixed(2)}h<br/>
+              💡 <strong>Horas del paquete:</strong> {autoPackageAlert.package.total_hours}h
+            </Box>
+          </Box>
+          <IconButton
+            icon={<span>×</span>}
+            size="sm"
+            variant="ghost"
+            color="white"
+            position="absolute"
+            top="8px"
+            right="8px"
+            onClick={dismissAutoPackageAlert}
+            _hover={{ bg: "green.800" }}
+          />
+        </Alert>
+      )}
+
+      {/* Alerta de horas normal */}
       {hoursAlert && (
         <Alert 
           status={hoursAlert.type}
@@ -353,7 +432,8 @@ export default function TicketDetail() {
                 </Button>
               </Flex>
               <Box fontSize="sm" color="gray.400" mt={2}>
-                * Ingrese las horas en formato HH:MM (ejemplo: 02:30 para 2 horas y 30 minutos)
+                * Ingrese las horas en formato HH:MM (ejemplo: 02:30 para 2 horas y 30 minutos)<br/>
+                🚀 <strong>Nuevo:</strong> Si las horas exceden la capacidad disponible, se creará automáticamente un paquete adicional
               </Box>
             </Box>
 

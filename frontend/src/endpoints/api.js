@@ -461,3 +461,21 @@ export const get_projects_hours_alerts = async (projectIds) => {
     throw e;
   }
 };
+
+// ============= NUEVAS FUNCIONES PARA PAQUETES AUTOMÁTICOS =============
+
+// Función para obtener alerta extendida de horas (con info de paquetes automáticos)
+export const get_project_hours_alert_extended = async (projectId, autoPackageId = null) => {
+  try {
+    const params = autoPackageId ? `?auto_package_id=${autoPackageId}` : '';
+    const { data } = await axios.get(`${PROJECTS_URL}${projectId}/hours-alert-extended/${params}`, {
+      withCredentials: true
+    });
+    return data;
+  } catch (e) {
+    return call_refresh(e, () => {
+      const params = autoPackageId ? `?auto_package_id=${autoPackageId}` : '';
+      return axios.get(`${PROJECTS_URL}${projectId}/hours-alert-extended/${params}`, { withCredentials: true });
+    });
+  }
+};
