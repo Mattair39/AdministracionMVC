@@ -21,7 +21,12 @@ from .views import (
     get_project_hours_info,
     check_project_package_coverage,
     get_projects_hours_alerts,
-    get_project_hours_alert_extended,  # NUEVA IMPORTACIÓN
+    get_project_hours_alert_extended,
+    get_ticket_status_info,
+    get_available_status_transitions,
+    validate_ticket_status_change,
+    update_ticket_status_with_validation,
+    get_all_ticket_statuses,
 )
 
 urlpatterns = [
@@ -50,7 +55,10 @@ urlpatterns = [
     path("projects/<int:project_id>/hours-info/", get_project_hours_info, name="project-hours-info"),
     path("projects/<int:project_id>/package-coverage/", check_project_package_coverage, name="project-package-coverage"),
     path("projects/hours-alerts/", get_projects_hours_alerts, name="projects-hours-alerts"),
-    
-    # NUEVA RUTA: Para alertas extendidas con información de paquetes automáticos
     path("projects/<int:project_id>/hours-alert-extended/", get_project_hours_alert_extended, name="project-hours-alert-extended"),
+    path("tickets/<int:ticket_id>/status-info/", get_ticket_status_info, name="ticket-status-info"),
+    path("tickets/<int:ticket_id>/status-transitions/", get_available_status_transitions, name="ticket-status-transitions"),
+    path("tickets/<int:ticket_id>/validate-status-change/", validate_ticket_status_change, name="validate-ticket-status-change"),
+    path("tickets/<int:ticket_id>/update-status/", update_ticket_status_with_validation, name="update-ticket-status"),
+    path("ticket-statuses/", get_all_ticket_statuses, name="all-ticket-statuses"),
 ]

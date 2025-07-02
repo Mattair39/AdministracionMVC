@@ -12,30 +12,29 @@ from .serializer import (
     ContractSerializer, ProjectSerializer, UserRegistrationSerializer,
     PackageSerializer, PackageWizardSerializer, TicketSerializer, WorklogSerializer, WorklogCreateSerializer
 )
-# NUEVO: Importar el servicio de cálculo de horas para implementar SRP
 from .services.hours_calculator import HoursCalculatorService
 from rest_framework import status
 from datetime import datetime, time
 import re
 
 
-class CustomTokenObtainPairView(TokenObtainPairView): # Extiende la vista estándar de JWT para implementar autenticación basada en cookies HTTP-only.
+class CustomTokenObtainPairView(TokenObtainPairView):
     def post(self, request, *args, **kwargs):
         resp = super().post(request, *args, **kwargs)
-        tokens = resp.data # Valida Credenciales y devuelve access y refresh tokens.
+        tokens = resp.data
         samesite, secure = ("Lax", False) if settings.DEBUG else ("None", True)
         res = Response({"success": True})
-        res.set_cookie("access_token",  tokens["access"], httponly=True, secure=secure, samesite=samesite, path="/") # Crea cookies seguras
+        res.set_cookie("access_token",  tokens["access"], httponly=True, secure=secure, samesite=samesite, path="/")
         res.set_cookie("refresh_token", tokens["refresh"], httponly=True, secure=secure, samesite=samesite, path="/")
         return res
 
-class CustomRefreshTokenView(TokenRefreshView): # Renueva el access token usando el refresh token almacenado en cookies.
+class CustomRefreshTokenView(TokenRefreshView):
     def post(self, request, *args, **kwargs):
         request.data["refresh"] = request.COOKIES.get("refresh_token")
-        resp = super().post(request, *args, **kwargs) # Inyecta en request
+        resp = super().post(request, *args, **kwargs)
         tok = resp.data
         samesite, secure = ("Lax", False) if settings.DEBUG else ("None", True)
-        res = Response({"refreshed": True}) # Renueva el token
+        res = Response({"refreshed": True})
         res.set_cookie("access_token", tok.get("access"), httponly=True, secure=secure, samesite=samesite, path="/")
         return res
 
@@ -57,7 +56,7 @@ def register(request):
     ser = UserRegistrationSerializer(data=request.data)
     if ser.is_valid():
         ser.save()
-        return Response(ser.data) # Respuesta con datos del usuario.
+        return Response(ser.data)
     return Response(ser.errors)
 
 class ContractListCreateAPIView(generics.ListCreateAPIView):
@@ -72,25 +71,7 @@ class ContractRetrieveUpdateDestroyAPIView(generics.RetrieveUpdateDestroyAPIView
     serializer_class = ContractSerializer
     permission_classes = [IsAuthenticated]
 
-# FUNCIÓN WRAPPER: Mantiene compatibilidad con el código existente
-# Implementa el principio de Responsabilidad Única (SRP)
 def calculate_available_hours(project):
-    """
-    Función wrapper para mantener compatibilidad con el código existente.
-    
-    NOTA: Esta función ahora delega al HoursCalculatorService para cumplir
-    con el principio de Responsabilidad Única (SRP). La lógica de cálculo
-    está encapsulada en una clase dedicada.
-    
-    Args:
-        project: Instancia del modelo Project
-    
-    Returns:
-        dict: Información de horas del proyecto
-            - total_package_hours: Horas totales de paquetes activos
-            - consumed_hours: Horas consumidas en worklogs
-            - available_hours: Horas disponibles (mínimo 0)
-    """
     calculator = HoursCalculatorService(project)
     return calculator.calculate_hours_summary()
 
@@ -110,8 +91,6 @@ class ProjectListCreateAPIView(generics.ListCreateAPIView):
         projects_data = []
         
         for project in queryset:
-            # CAMBIO: Usar directamente el servicio para mayor eficiencia y claridad
-            # Aplicación del principio SRP - el servicio se encarga únicamente del cálculo
             calculator = HoursCalculatorService(project)
             hours_info = calculator.calculate_hours_summary()
             
@@ -142,12 +121,9 @@ class ProjectRetrieveUpdateDestroyAPIView(generics.RetrieveUpdateDestroyAPIView)
         instance = self.get_object()
         serializer = self.get_serializer(instance)
         
-        # CAMBIO: Usar directamente el servicio
-        # Aplicación del principio SRP - separación de responsabilidades
         calculator = HoursCalculatorService(instance)
         hours_info = calculator.calculate_hours_summary()
         
-        # Obtener tickets asociados
         tickets = Ticket.objects.filter(project=instance).select_related('assigned_user').prefetch_related('worklogs')
         tickets_data = []
         for ticket in tickets:
@@ -162,7 +138,6 @@ class ProjectRetrieveUpdateDestroyAPIView(generics.RetrieveUpdateDestroyAPIView)
                 'created_at': ticket.created_at,
             })
         
-        # Obtener paquetes asociados
         packages = Package.objects.filter(package_projects__project=instance)
         packages_data = []
         today = timezone.now().date()
@@ -283,17 +258,14 @@ def get_users_for_assignment(request):
         return Response({'error': str(e)}, status=500)
 
 def parse_time_input(time_str):
-    """Convierte formato HH:MM a decimal de horas"""
     if not time_str:
         return 0
     
-    # Si es decimal, se devuelve
     try:
         return float(time_str)
     except ValueError:
         pass
     
-    # Parsear formato HH:MM
     time_pattern = re.match(r'^(\d{1,2}):(\d{2})$', time_str.strip())
     if time_pattern:
         hours = int(time_pattern.group(1))
@@ -302,14 +274,12 @@ def parse_time_input(time_str):
     
     raise ValueError("Formato de tiempo inválido. Use HH:MM o decimal.")
 
-# FUNCIÓN MODIFICADA: create_worklog con generación automática de paquetes
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 def create_worklog(request, ticket_id):
     try:
         ticket = Ticket.objects.get(ticket_id=ticket_id)
         
-        # Procesar el formato de horas
         data = request.data.copy()
         hours_to_add = 0
         
@@ -320,11 +290,9 @@ def create_worklog(request, ticket_id):
             except ValueError as e:
                 return Response({'hours_logged': [str(e)]}, status=status.HTTP_400_BAD_REQUEST)
         
-        # NUEVA FUNCIONALIDAD: Verificar si se necesita crear paquete adicional
         project = ticket.project
         work_date = data.get('work_date')
         
-        # Convertir work_date si es string
         if isinstance(work_date, str):
             try:
                 from datetime import datetime
@@ -332,18 +300,15 @@ def create_worklog(request, ticket_id):
             except:
                 work_date = timezone.now().date()
         
-        # Verificar y crear paquete adicional si es necesario
         auto_package_info = project.check_and_create_additional_package_if_needed(
             hours_to_add, work_date
         )
         
-        # Crear el worklog normalmente
         serializer = WorklogCreateSerializer(data=data, context={'ticket': ticket})
         
         if serializer.is_valid():
             worklog = serializer.save()
             
-            # Preparar respuesta con información del paquete automático
             response_data = serializer.data
             
             if auto_package_info['package_created']:
@@ -370,16 +335,11 @@ def delete_worklog(request, worklog_id):
     except Worklog.DoesNotExist:
         return Response({'error': 'Worklog no encontrado'}, status=404)
 
-# Para alerta de horas - USANDO EL MÉTODO EXISTENTE DEL MODELO
-
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def get_project_hours_info(request, project_id):
-    """Obtiene información de horas disponibles y consumidas del proyecto"""
     try:
         project = Project.objects.get(id=project_id)
-        # NOTA: Mantiene compatibilidad usando el método existente del modelo
-        # que internamente puede usar el servicio si se actualiza
         hours_info = project.get_hours_info()
         return Response(hours_info)
     except Project.DoesNotExist:
@@ -388,7 +348,6 @@ def get_project_hours_info(request, project_id):
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def check_project_package_coverage(request, project_id):
-    """Verifica cobertura de paquetes para una fecha específica"""
     try:
         project = Project.objects.get(id=project_id)
         work_date = request.query_params.get('work_date')
@@ -412,7 +371,6 @@ def check_project_package_coverage(request, project_id):
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 def get_projects_hours_alerts(request):
-    """Obtiene alertas de horas para múltiples proyectos"""
     project_ids = request.data.get('project_ids', [])
     
     if not project_ids:
@@ -431,17 +389,12 @@ def get_projects_hours_alerts(request):
     
     return Response(alerts)
 
-# NUEVA FUNCIÓN: Alerta extendida de horas con información de paquetes automáticos
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def get_project_hours_alert_extended(request, project_id):
-    """
-    Obtiene alerta de horas extendida que puede incluir información de paquetes automáticos
-    """
     try:
         project = Project.objects.get(id=project_id)
         
-        # Verificar si hay parámetros de paquete automático en query params
         auto_package_id = request.query_params.get('auto_package_id')
         auto_package_info = None
         
@@ -466,3 +419,123 @@ def get_project_hours_alert_extended(request, project_id):
         
     except Project.DoesNotExist:
         return Response({'error': 'Proyecto no encontrado'}, status=404)
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def get_ticket_status_info(request, ticket_id):
+    try:
+        ticket = Ticket.objects.get(ticket_id=ticket_id)
+        status_info = ticket.get_status_info()
+        return Response(status_info)
+    except Ticket.DoesNotExist:
+        return Response({'error': 'Ticket no encontrado'}, status=404)
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def get_available_status_transitions(request, ticket_id):
+    try:
+        ticket = Ticket.objects.get(ticket_id=ticket_id)
+        
+        current_status_info = ticket.get_status_info()
+        next_statuses = ticket.get_next_valid_statuses()
+        
+        from .strategies.ticket_status_strategies import TicketStatusManager
+        transitions = []
+        
+        for status in next_statuses:
+            status_info = TicketStatusManager.get_status_info(status)
+            transitions.append(status_info)
+        
+        return Response({
+            'current_status': current_status_info,
+            'available_transitions': transitions
+        })
+    except Ticket.DoesNotExist:
+        return Response({'error': 'Ticket no encontrado'}, status=404)
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def validate_ticket_status_change(request, ticket_id):
+    try:
+        ticket = Ticket.objects.get(ticket_id=ticket_id)
+        new_status = request.data.get('new_status')
+        
+        if not new_status:
+            return Response({
+                'error': 'El campo new_status es requerido'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        validation_result = ticket.validate_status_transition(new_status)
+        
+        if validation_result['valid']:
+            return Response({
+                'valid': True,
+                'message': f'La transición a "{new_status}" es válida'
+            })
+        else:
+            return Response({
+                'valid': False,
+                'errors': validation_result['errors']
+            }, status=status.HTTP_400_BAD_REQUEST)
+    
+    except Ticket.DoesNotExist:
+        return Response({'error': 'Ticket no encontrado'}, status=404)
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def get_all_ticket_statuses(request):
+    from .strategies.ticket_status_strategies import TicketStatusManager
+    
+    all_statuses = TicketStatusManager.get_all_statuses()
+    statuses_info = []
+    
+    for status_name in all_statuses:
+        status_info = TicketStatusManager.get_status_info(status_name)
+        statuses_info.append(status_info)
+    
+    return Response({
+        'statuses': statuses_info,
+        'count': len(statuses_info)
+    })
+
+@api_view(["PATCH"])
+@permission_classes([IsAuthenticated])
+def update_ticket_status_with_validation(request, ticket_id):
+    try:
+        ticket = Ticket.objects.get(ticket_id=ticket_id)
+        new_status = request.data.get('status')
+        
+        if not new_status:
+            return Response({
+                'error': 'El campo status es requerido'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        validation_result = ticket.validate_status_transition(new_status)
+        
+        if not validation_result['valid']:
+            return Response({
+                'valid': False,
+                'errors': validation_result['errors']
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        old_status = ticket.status
+        ticket.status = new_status
+        ticket.save()
+        
+        status_info = ticket.get_status_info()
+        
+        return Response({
+            'success': True,
+            'message': f'Estado actualizado de "{old_status}" a "{new_status}"',
+            'ticket_id': ticket.ticket_id,
+            'old_status': old_status,
+            'new_status': new_status,
+            'status_info': status_info
+        })
+    
+    except Ticket.DoesNotExist:
+        return Response({'error': 'Ticket no encontrado'}, status=404)
+    except Exception as e:
+        return Response({
+            'error': f'Error interno: {str(e)}'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

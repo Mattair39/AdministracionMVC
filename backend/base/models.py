@@ -280,6 +280,53 @@ class Ticket(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
     owner = models.ForeignKey(User, on_delete=models.CASCADE, related_name='created_tickets')
 
+    def get_status_strategy(self):
+        from .strategies.ticket_status_strategies import TicketStatusManager
+        return TicketStatusManager.get_strategy(self.status)
+    
+    def get_next_valid_statuses(self):
+        return self.get_status_strategy().get_next_valid_statuses()
+    
+    def can_log_hours(self):
+        return self.get_status_strategy().can_log_hours()
+    
+    def get_status_color(self):
+        return self.get_status_strategy().get_status_color()
+    
+    def get_status_icon(self):
+        return self.get_status_strategy().get_status_icon()
+    
+    def can_edit_ticket(self):
+        return self.get_status_strategy().can_edit_ticket()
+    
+    def requires_user_assignment(self):
+        return self.get_status_strategy().requires_user_assignment()
+    
+    def get_status_info(self):
+        from .strategies.ticket_status_strategies import TicketStatusManager
+        return TicketStatusManager.get_status_info(self.status)
+    
+    def can_transition_to(self, new_status):
+        return new_status in self.get_next_valid_statuses()
+    
+    def validate_status_transition(self, new_status):
+        errors = []
+        
+        if not self.can_transition_to(new_status):
+            valid_statuses = ', '.join(self.get_next_valid_statuses())
+            errors.append(f"No se puede cambiar de '{self.status}' a '{new_status}'. Estados válidos: {valid_statuses}")
+        
+        from .strategies.ticket_status_strategies import TicketStatusManager
+        new_strategy = TicketStatusManager.get_strategy(new_status)
+        
+        if new_strategy.requires_user_assignment() and not self.assigned_user:
+            errors.append(f"El estado '{new_status}' requiere que el ticket tenga un usuario asignado")
+        
+        return {
+            'valid': len(errors) == 0,
+            'errors': errors
+        }
+
     def __str__(self):
         return f"#{self.ticket_id} - {self.subject}"
 
