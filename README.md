@@ -2,8 +2,9 @@
 
 Aplicación web con **autenticación JWT** (almacenado en cookies _HttpOnly_) y CRUD relacionado de **Contratos** y **Proyectos**, desarrollada bajo el patrón **MVC** con **Django + Django REST Framework** en el backend y **React + Chakra UI** en el frontend. Contempla la administración del sistema mediante la aplicación de validaciones para elementos sensibles del Core y relaciona los elementos de las tablas de manera orgánica y lo muestra mediante dropdowns y Tabs relacionados.
 
----
+Arquitectura mejorada con implementación de **principios SOLID** (**Single Responsibility** para servicios de cálculo de horas y **Open/Closed** para sistema extensible de estados) y **patrones de diseño** (**Strategy Pattern** para manejo de estados de tickets y **Factory Pattern** para creación controlada de estrategias), garantizando código más mantenible, extensible y profesional sin afectar la funcionalidad existente.
 
+---
 ## Descripción del Proyecto
 
 1. **Autenticación segura**  
