@@ -69,7 +69,6 @@ export const register = async (username, email, password) => {
   return data;
 };
 
-// ============= CONTRACTS =============
 export const get_contracts = async () => {
   try {
     const { data } = await axios.get(CONTRACTS_URL, { withCredentials: true });
@@ -136,7 +135,6 @@ export const delete_contract = async (id) => {
   }
 };
 
-// ============= PROJECTS =============
 export const get_projects = async (contractId) => {
   try {
     const url = contractId ? `${PROJECTS_URL}?contract=${contractId}` : PROJECTS_URL;
@@ -203,7 +201,6 @@ export const delete_project = async (id) => {
   }
 };
 
-// ============= PACKAGES =============
 export const get_packages = async (contractId) => {
   try {
     const url = contractId ? `${PACKAGES_URL}?contract=${contractId}` : PACKAGES_URL;
@@ -300,7 +297,6 @@ export const get_contract_projects_for_packages = async (contractId) => {
   }
 };
 
-// ============= TICKETS =============
 export const get_tickets = async (projectId) => {
   try {
     const url = projectId ? `${TICKETS_URL}?project=${projectId}` : TICKETS_URL;
@@ -369,7 +365,6 @@ export const delete_ticket = async (ticketId) => {
   }
 };
 
-// ============= USERS =============
 export const get_users = async () => {
   try {
     const { data } = await axios.get(USERS_URL, { withCredentials: true });
@@ -381,7 +376,6 @@ export const get_users = async () => {
   }
 };
 
-// ============= WORKLOGS =============
 export const create_worklog = async (ticketId, worklogData) => {
   try {
     const { data } = await axios.post(`${TICKETS_URL}${ticketId}/worklogs/`, worklogData, {
@@ -411,8 +405,6 @@ export const delete_worklog = async (worklogId) => {
   }
 };
 
-// ============= ALERTAS DE HORAS =============
-// Obtener información de horas de un proyecto específico
 export const get_project_hours_info = async (projectId) => {
   try {
     const { data } = await axios.get(`${PROJECTS_URL}${projectId}/hours-info/`, { 
@@ -426,7 +418,6 @@ export const get_project_hours_info = async (projectId) => {
   }
 };
 
-// Verificar cobertura de paquetes para una fecha específica
 export const check_package_coverage = async (projectId, workDate) => {
   try {
     const { data } = await axios.get(`${PROJECTS_URL}${projectId}/package-coverage/`, {
@@ -444,7 +435,6 @@ export const check_package_coverage = async (projectId, workDate) => {
   }
 };
 
-// Obtener alertas de horas para múltiples proyectos (para TicketsList)
 export const get_projects_hours_alerts = async (projectIds) => {
   try {
     const { data } = await axios.post(`${BASE_URL}projects/hours-alerts/`, {
@@ -462,9 +452,6 @@ export const get_projects_hours_alerts = async (projectIds) => {
   }
 };
 
-// ============= NUEVAS FUNCIONES PARA PAQUETES AUTOMÁTICOS =============
-
-// Función para obtener alerta extendida de horas (con info de paquetes automáticos)
 export const get_project_hours_alert_extended = async (projectId, autoPackageId = null) => {
   try {
     const params = autoPackageId ? `?auto_package_id=${autoPackageId}` : '';

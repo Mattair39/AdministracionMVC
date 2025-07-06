@@ -143,7 +143,6 @@ class TicketStatusManager:
         'Recibido': RecibidoStatusStrategy(),
         'En Proceso': EnProcesoStatusStrategy(),
         'Entregado': EntregadoStatusStrategy(),
-        # Nuevos estados se pueden agregar aquí sin modificar código existente
     }
     
     @classmethod
