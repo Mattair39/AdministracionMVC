@@ -80,9 +80,9 @@ USE_TZ = True
 
 CORS_ALLOWED_ORIGINS = os.environ.get(
     "CORS_ALLOWED_ORIGINS",
-    "http://localhost:3000,https://administracionmvc-static.onrender.com" # (React: Puerto 3000) y (Backend: Puesto 8000)
+    "http://localhost:3000,http://localhost:3001,http://127.0.0.1:3000,http://127.0.0.1:3001,https://administracionmvc-static.onrender.com"
 ).split(",")
-CORS_ALLOW_CREDENTIALS = True # (Permite envio de cookies entre dominios).
+CORS_ALLOW_CREDENTIALS = True 
 
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": (

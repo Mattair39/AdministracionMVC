@@ -31,6 +31,12 @@ export default function TopBar() {
           Tickets
         </Button>
       )}
+
+      {isAuthenticated && (
+        <Button colorScheme="purple" ml={4} onClick={() => nav("/api-view")}>
+          Dashboard
+        </Button>
+      )}
       <Spacer />
       {isAuthenticated && (
         <Text color="gray.100" mr={4}>

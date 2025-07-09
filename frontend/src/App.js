@@ -19,6 +19,8 @@ import ProjectForm from "./routes/projectForm";
 import TicketsList from "./routes/TicketsList";
 import TicketForm from "./routes/TicketForm";
 import TicketDetail from "./routes/TicketDetail";
+// ← NUEVA IMPORTACIÓN
+import ApiView from "./routes/ApiView";
 
 const theme = extendTheme({
   config: { initialColorMode: "dark", useSystemColorMode: false },
@@ -42,7 +44,7 @@ const theme = extendTheme({
 export default function App() {
   return (
     <ChakraProvider theme={theme}>
-      <ColorModeScript initialColorMode="dark" />
+      <ColorModeScript initialColorMode />
       <Router>
         <AuthProvider>
           <TopBar />
@@ -122,6 +124,16 @@ export default function App() {
                 element={
                   <PrivateRoute>
                     <TicketDetail />
+                  </PrivateRoute>
+                }
+              />
+
+              {/* ← NUEVA RUTA PARA LA API */}
+              <Route
+                path="/api-view"
+                element={
+                  <PrivateRoute>
+                    <ApiView />
                   </PrivateRoute>
                 }
               />

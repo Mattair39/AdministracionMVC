@@ -539,3 +539,66 @@ def update_ticket_status_with_validation(request, ticket_id):
         return Response({
             'error': f'Error interno: {str(e)}'
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+# API para listado de tickets
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def simple_tickets_api(request):
+    """
+    API súper simple para obtener listado de tickets en JSON
+    """
+    try:
+        # Obtener todos los tickets con información básica
+        tickets = Ticket.objects.all().select_related(
+            'project', 'project__contract', 'assigned_user'
+        ).prefetch_related('worklogs')
+        
+        tickets_data = []
+        for ticket in tickets:
+            # Calcular horas totales de forma segura
+            total_hours = 0
+            try:
+                total_hours = sum(float(worklog.hours_logged) for worklog in ticket.worklogs.all())
+            except:
+                total_hours = 0
+            
+            # Datos básicos del ticket
+            ticket_data = {
+                'ticket_id': ticket.ticket_id,
+                'subject': ticket.subject or 'Sin asunto',
+                'description': ticket.description or 'Sin descripción',
+                'status': ticket.status,
+                'requester': ticket.requester or 'Sin especificar',
+                'total_hours': total_hours,
+                'created_at': ticket.created_at.strftime('%Y-%m-%d %H:%M:%S'),
+                'updated_at': ticket.updated_at.strftime('%Y-%m-%d %H:%M:%S'),
+                'project_name': ticket.project.name if ticket.project else 'Sin proyecto',
+                'contract_name': ticket.project.contract.contract_name if ticket.project and ticket.project.contract else 'Sin contrato',
+                'client_name': ticket.project.contract.client_name if ticket.project and ticket.project.contract else 'Sin cliente',
+                'assigned_user': ticket.assigned_user.username if ticket.assigned_user else 'Sin asignar',
+                'worklogs_count': ticket.worklogs.count()
+            }
+            tickets_data.append(ticket_data)
+        
+        # Estadísticas básicas
+        total_tickets = len(tickets_data)
+        total_hours_all = sum(ticket['total_hours'] for ticket in tickets_data)
+        
+        # Respuesta final
+        return Response({
+            'success': True,
+            'total_tickets': total_tickets,
+            'total_hours': total_hours_all,
+            'tickets': tickets_data,
+            'user': request.user.username,
+            'endpoint': 'simple_tickets_api'
+        })
+        
+    except Exception as e:
+        return Response({
+            'success': False,
+            'error': str(e),
+            'user': request.user.username if hasattr(request, 'user') else 'Unknown'
+        }, status=500)
+        
+
