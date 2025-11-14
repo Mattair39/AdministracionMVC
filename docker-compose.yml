@@ -1,0 +1,27 @@
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    environment:
+      PORT: 8000
+      DEBUG: "False"
+    volumes:
+      - django_media:/app/media
+      - django_static:/app/staticfiles
+    ports:
+      - "9001:8000"
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "3002:80"
+    depends_on:
+      - backend
+
+volumes:
+  django_media:
+  django_static:
+
