@@ -6,6 +6,9 @@ services:
     environment:
       PORT: 8000
       DEBUG: "False"
+      KEYCLOAK_ISSUER: http://host.docker.internal:8081/realms/fitFlow
+      KEYCLOAK_CLIENT_ID: proyectocoremvc-web
+      KEYCLOAK_JWKS_URL: http://host.docker.internal:8081/realms/fitFlow/protocol/openid-connect/certs
     volumes:
       - django_media:/app/media
       - django_static:/app/staticfiles
@@ -16,6 +19,11 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      args:
+        REACT_APP_KEYCLOAK_URL: http://localhost:8081
+        REACT_APP_KEYCLOAK_REALM: fitFlow
+        REACT_APP_KEYCLOAK_CLIENT_ID: proyectocoremvc-web
+        REACT_APP_API_URL: http://localhost:9001
     ports:
       - "3002:80"
     depends_on:

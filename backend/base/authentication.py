@@ -1,4 +1,7 @@
 from rest_framework_simplejwt.authentication import JWTAuthentication
+from rest_framework.authentication import BaseAuthentication
+from rest_framework.exceptions import AuthenticationFailed
+from .core.keycloak import verify_keycloak_token, get_or_create_user_from_token
 
 class CookiesJWTAuthentication(JWTAuthentication):
     def authenticate(self, request): # (Contiene toda la información de la petición HTTP (headers, cookies)).
@@ -16,3 +19,26 @@ class CookiesJWTAuthentication(JWTAuthentication):
         return(user, validated_token)
     
     # (Permite que el frontend con React se autentique con el backend utilizando JWT en cookies).
+
+class KeycloakAuthentication(BaseAuthentication):
+    """Autenticación usando tokens de Keycloak"""
+    
+    def authenticate(self, request):
+        auth_header = request.META.get('HTTP_AUTHORIZATION', '')
+        
+        if not auth_header.startswith('Bearer '):
+            return None
+        
+        token = auth_header.split(' ')[1]
+        
+        # Verificar token con Keycloak
+        claims = verify_keycloak_token(token)
+        if not claims:
+            raise AuthenticationFailed('Token inválido o expirado')
+        
+        # Obtener o crear usuario
+        user = get_or_create_user_from_token(claims)
+        if not user:
+            raise AuthenticationFailed('No se pudo obtener el usuario del token')
+        
+        return (user, token)

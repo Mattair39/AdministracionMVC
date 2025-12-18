@@ -29,6 +29,7 @@ from .views import (
     update_ticket_status_with_validation,
     get_all_ticket_statuses,
     simple_tickets_api,
+    get_current_user,
 )
 
 urlpatterns = [
@@ -37,6 +38,7 @@ urlpatterns = [
     path("logout/", logout, name="logout"),
     path("authenticated/", is_authenticated, name="is_authenticated"),
     path("register/", register, name="register"),
+    path("auth/me/", get_current_user, name="get_current_user"),
     
     # Contratos
     path("contracts/", ContractListCreateAPIView.as_view(), name="contract-list"),

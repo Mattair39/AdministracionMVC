@@ -600,5 +600,18 @@ def simple_tickets_api(request):
             'error': str(e),
             'user': request.user.username if hasattr(request, 'user') else 'Unknown'
         }, status=500)
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def get_current_user(request):
+    """Obtiene el perfil del usuario actual autenticado"""
+    user = request.user
+    return Response({
+        'id': user.id,
+        'username': user.username,
+        'email': user.email,
+        'first_name': user.first_name,
+        'last_name': user.last_name,
+    })
         
 

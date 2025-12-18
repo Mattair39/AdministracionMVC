@@ -1,6 +1,6 @@
 import {
     VStack, Button, FormControl, FormLabel,
-    Input, Heading, Text, Box
+    Input, Heading, Text, Box, Divider
   } from "@chakra-ui/react";
   import { useState } from "react";
   import { useAuth } from "../contexts/useAuth";
@@ -9,7 +9,7 @@ import {
   const Login = () => {
     const [username, setUsername] = useState("");
     const [password, setPassword] = useState("");
-    const { login_user } = useAuth();
+    const { login_user, login_with_keycloak } = useAuth();
     const nav = useNavigate();
   
     return (
@@ -45,6 +45,16 @@ import {
           <Button colorScheme="teal" onClick={() => login_user(username, password)}>
             Login
           </Button>
+
+          <Divider borderColor="gray.600" />
+
+          <Button 
+            colorScheme="blue" 
+            variant="outline"
+            onClick={login_with_keycloak}
+          >
+            Iniciar Sesión con Keycloak
+          </Button>
   
           <Text
             fontSize="sm"
@@ -53,7 +63,7 @@ import {
             _hover={{ textDecoration: "underline", cursor: "pointer" }}
             onClick={() => nav("/register")}
           >
-            ¿No tienes cuenta? Regístrate
+            ¿No tienes cuenta? Regístrate
           </Text>
         </VStack>
       </Box>

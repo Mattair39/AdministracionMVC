@@ -86,7 +86,8 @@ CORS_ALLOW_CREDENTIALS = True
 
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": (
-        "base.authentication.CookiesJWTAuthentication", # (Como se autentica cada request - JWT con cookies).
+        "base.authentication.KeycloakAuthentication",  # Primero intenta Keycloak
+        "base.authentication.CookiesJWTAuthentication",  # Fallback a JWT tradicional
     ),
     "DEFAULT_PERMISSION_CLASSES": [
         "rest_framework.permissions.IsAuthenticated",

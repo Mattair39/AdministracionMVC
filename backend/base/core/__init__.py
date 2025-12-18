@@ -1,0 +1,2 @@
+# Este archivo hace que 'core' sea un paquete Python
+
