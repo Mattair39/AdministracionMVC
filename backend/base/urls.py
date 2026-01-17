@@ -31,6 +31,13 @@ from .views import (
     simple_tickets_api,
     get_current_user,
 )
+from base.api.integrations import (
+    receive_person_from_fitflow,
+    send_person_to_fitflow,
+    send_food_to_fitflow,
+    test_encryption,
+    receive_contract_from_fitflow,
+)
 
 urlpatterns = [
     path("token/", CustomTokenObtainPairView.as_view(), name="token_obtain_pair"),
@@ -76,4 +83,10 @@ urlpatterns = [
     
     path("simple-api/", simple_tickets_api, name="simple-tickets-api"),
     
+    # Integraciones con FitFlow
+    path("integrations/person/receive/", receive_person_from_fitflow, name="receive-person"),
+    path("integrations/person/send/", send_person_to_fitflow, name="send-person"),
+    path("integrations/food/send/", send_food_to_fitflow, name="send-food"),
+    path("integrations/contract/", receive_contract_from_fitflow, name="receive-contract"),
+    path("integrations/test-encryption/", test_encryption, name="test-encryption"),
 ]

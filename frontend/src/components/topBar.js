@@ -37,6 +37,13 @@ export default function TopBar() {
           Dashboard
         </Button>
       )}
+
+      {isAuthenticated && (
+        <Button colorScheme="orange" ml={4} onClick={() => nav("/integrations")}>
+          Integraciones
+        </Button>
+      )}
+
       <Spacer />
       {isAuthenticated && (
         <Text color="gray.100" mr={4}>

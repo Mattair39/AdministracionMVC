@@ -21,6 +21,7 @@ import TicketForm from "./routes/TicketForm";
 import TicketDetail from "./routes/TicketDetail";
 // ← NUEVA IMPORTACIÓN
 import ApiView from "./routes/ApiView";
+import Integrations from "./routes/Integrations";
 
 const theme = extendTheme({
   config: { initialColorMode: "dark", useSystemColorMode: false },
@@ -134,6 +135,16 @@ export default function App() {
                 element={
                   <PrivateRoute>
                     <ApiView />
+                  </PrivateRoute>
+                }
+              />
+
+              {/* ← NUEVA RUTA PARA INTEGRACIONES */}
+              <Route
+                path="/integrations"
+                element={
+                  <PrivateRoute>
+                    <Integrations />
                   </PrivateRoute>
                 }
               />

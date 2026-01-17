@@ -6,9 +6,20 @@ services:
     environment:
       PORT: 8000
       DEBUG: "False"
+      ALLOWED_HOSTS: "localhost,127.0.0.1,host.docker.internal,administracionmvc-hpfl.onrender.com"
       KEYCLOAK_ISSUER: http://host.docker.internal:8081/realms/fitFlow
       KEYCLOAK_CLIENT_ID: proyectocoremvc-web
       KEYCLOAK_JWKS_URL: http://host.docker.internal:8081/realms/fitFlow/protocol/openid-connect/certs
+      # Vault Configuration (Vault externo en localhost:8200)
+      VAULT_ADDR: http://host.docker.internal:8200
+      VAULT_TOKEN: fitflow-dev-token
+      VAULT_TRANSIT_KEY_NAME: fitflow-django-key
+      VAULT_TRANSIT_MOUNT_PATH: transit
+      ENCRYPT_REQUESTS_TO_FITFLOW: "true"
+      ENCRYPT_RESPONSES_FROM_FITFLOW: "true"
+      FITFLOW_API_BASE_URL: http://host.docker.internal:8080
+      VAULT_REQUEST_TIMEOUT: "5"
+      VAULT_MAX_RETRIES: "3"
     volumes:
       - django_media:/app/media
       - django_static:/app/staticfiles

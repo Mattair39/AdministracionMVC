@@ -33,6 +33,7 @@ MIDDLEWARE = [
     "whitenoise.middleware.WhiteNoiseMiddleware", # (Sirve archivos estaticos en producción).
     "django.contrib.sessions.middleware.SessionMiddleware",
     "corsheaders.middleware.CorsMiddleware", # (Permite requests de distintos dominios).
+    "base.middleware.decryption.DecryptionMiddleware",  # Middleware para descifrar requests de FitFlow
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",

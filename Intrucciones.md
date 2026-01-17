@@ -1,249 +1,257 @@
-# Integración del Segundo Proyecto al Realm Existente de Keycloak
+# 🔐 Arquitectura de Cifrado con HashiCorp Vault Transit Engine
 
-Este documento resume *únicamente* los pasos esenciales realizados para integrar el segundo proyecto (**ProyectoCoreMVC**) al **mismo realm Keycloak** ya utilizado por otra solución, habilitando **Single Sign-On (SSO) compartido** entre ambas aplicaciones.
+## 📋 Visión General
 
----
-
-## 📋 Tabla de Contenidos
-
-1. [Objetivo](#-objetivo)
-2. [Uso del Mismo Realm Existente](#-1-uso-del-mismo-realm-existente)
-3. [Creación del Nuevo Client](#-2-creación-del-nuevo-client-para-este-proyecto)
-4. [Integración del Backend](#-3-integración-del-backend-django)
-5. [Integración del Frontend](#-4-integración-del-frontend-react)
-6. [Variables de Entorno Docker](#-5-variables-de-entorno-docker)
-7. [Flujo de Autenticación SSO](#-6-flujo-de-autenticación-sso)
+Implementación de cifrado/descifrado de payloads HTTP entre sistemas usando HashiCorp Vault como Key Management Service (KMS) centralizado.
 
 ---
 
-## 🧩 Objetivo
+## 🏗️ Arquitectura de Alto Nivel
 
-Permitir que el segundo proyecto comparta:
-
-- ✅ **Autenticación centralizada** en Keycloak
-- ✅ **Login y logout unificados** (SSO)
-- ✅ **Usuarios, tokens y sesiones** del mismo **realm**
-
----
-
-## 🔑 1. Uso del Mismo Realm Existente
-
-Se reutilizó el realm ya funcional:
-
-### Realm: `fitFlow`
-
-➡️ **Esto permite que ambas aplicaciones compartan usuarios, roles y sesiones.**
-
----
-
-## 🧱 2. Creación del Nuevo Client para Este Proyecto
-
-En Keycloak se creó un client exclusivo para el segundo proyecto:
-
-| Atributo | Valor |
-|----------|-------|
-| **Client ID** | `proyectocoremvc-web` |
-| **Protocolo** | `openid-connect` |
-| **Tipo** | `public` |
-| **Root URL** | `http://localhost:3002` |
-
-### 🔁 Redirects Configurados
-
-**Valid redirect URIs:**
 ```
-http://localhost:3002/*
-http://localhost:3002/login
-http://localhost:3002/silent-check-sso.html
-```
-
-**Post logout redirect URIs:**
-```
-http://localhost:3002/*
-http://localhost:3002/login
-```
-
-**Web origins:**
-```
-http://localhost:3002
-http://localhost:9001
+┌─────────────────┐         ┌──────────────────┐         ┌─────────────────┐
+│   Sistema A     │         │  HashiCorp Vault │         │   Sistema B     │
+│  (FitFlow)      │         │  Transit Engine │         │   (Django)      │
+│                 │         │                 │         │                 │
+│  FastAPI        │         │                 │         │  Django REST   │
+│  + React        │         │  ┌───────────┐  │         │  + React       │
+│                 │         │  │ Encryption│  │         │                 │
+│  ┌───────────┐ │         │  │ Key Ring  │  │         │  ┌───────────┐ │
+│  │ Middleware│ │────────▶│  │           │  │◀────────│  │ Middleware│ │
+│  │ Encrypt   │ │ Request │  │ Decrypt   │  │ Response│  │ Decrypt   │ │
+│  └───────────┘ │         │  └───────────┘  │         │  └───────────┘ │
+│                 │         │                 │         │                 │
+│  ┌───────────┐ │         │                 │         │  ┌───────────┐ │
+│  │ Middleware│ │◀────────│                 │────────▶│  │ Middleware│ │
+│  │ Decrypt   │ │Response │                 │ Request │  │ Encrypt   │ │
+│  └───────────┘ │         │                 │         │  └───────────┘ │
+└─────────────────┘         └──────────────────┘         └─────────────────┘
 ```
 
 ---
 
-## 🔧 3. Integración del Backend (Django)
+## 🔑 Componentes Principales
 
-### Dependencias Agregadas
+### 1. **HashiCorp Vault Transit Engine**
+- **Función**: KMS centralizado para cifrado/descifrado
+- **Ubicación**: Servicio independiente (Docker)
+- **Responsabilidades**:
+  - Almacenar y rotar claves de cifrado
+  - Realizar operaciones de cifrado/descifrado
+  - Gestionar políticas de acceso
+  - Auditoría de operaciones
 
-Se agregaron las siguientes dependencias a `requirements.txt`:
+### 2. **Cliente Vault (Python/FastAPI)**
+- **Función**: Interfaz con Vault Transit Engine
+- **Ubicación**: `fitFlow/backend/app/core/vault.py`
+- **Responsabilidades**:
+  - Autenticación con Vault (AppRole, Token, etc.)
+  - Encriptar payloads JSON antes de enviar
+  - Desencriptar payloads JSON recibidos
+  - Manejo de errores y reintentos
+  - Caché de tokens de autenticación
 
-```txt
-python-jose[cryptography]==3.3.0
-httpx==0.27.0
-pydantic==2.9.2
+### 3. **Middleware de Cifrado (FastAPI)**
+- **Función**: Interceptar requests/responses y aplicar cifrado
+- **Ubicación**: `fitFlow/backend/app/middleware/encryption.py`
+- **Responsabilidades**:
+  - Detectar requests salientes (a Sistema B)
+  - Cifrar body JSON antes de enviar
+  - Agregar headers de metadatos
+  - Interceptar responses entrantes (de Sistema B)
+  - Desencriptar body JSON recibido
+
+### 4. **Middleware de Descifrado (FastAPI)**
+- **Función**: Interceptar requests entrantes y descifrar
+- **Ubicación**: `fitFlow/backend/app/middleware/decryption.py`
+- **Responsabilidades**:
+  - Detectar requests entrantes (de Sistema B)
+  - Verificar headers de cifrado
+  - Desencriptar body JSON
+  - Pasar request descifrado al endpoint
+
+### 5. **Configuración y Utilidades**
+- **Función**: Gestión de configuración y helpers
+- **Ubicación**: `fitFlow/backend/app/core/vault_config.py`
+- **Responsabilidades**:
+  - Cargar configuración de Vault
+  - Validar configuración
+  - Helpers para serialización JSON
+  - Logging y métricas
+
+---
+
+## 🔄 Flujo de Cifrado/Descifrado
+
+### Flujo 1: Request de A → B (Cifrado)
+
+```
+1. Cliente hace request a endpoint de FitFlow
+2. FitFlow procesa request normalmente
+3. FitFlow necesita hacer request a Django
+4. Middleware intercepta request saliente
+5. Middleware extrae body JSON
+6. Cliente Vault cifra body usando Transit Engine
+7. Request se envía con body cifrado + headers
+8. Django recibe request cifrado
+9. Django descifra usando su middleware
+10. Django procesa request normalmente
 ```
 
-### Autenticación con Keycloak
+### Flujo 2: Response de B → A (Cifrado)
 
-Se añadió la clase `KeycloakAuthentication` que:
+```
+1. Django genera response
+2. Middleware Django intercepta response
+3. Cliente Vault Django cifra body JSON
+4. Response se envía con body cifrado
+5. FitFlow recibe response cifrado
+6. Middleware FitFlow intercepta response
+7. Cliente Vault FitFlow descifra body
+8. Response descifrado se entrega al cliente
+```
 
-- ✅ Lee el token `Bearer <token>` del header `Authorization`
-- ✅ Valida su firma con las **JWKS** del realm
-- ✅ Crea un usuario Django **automáticamente** si no existe
-- ✅ Autentica basándose en los **claims** del token
+---
 
-**Configuración en `settings.py`:**
+## 🛡️ Consideraciones de Seguridad
 
-```python
-REST_FRAMEWORK = {
-    "DEFAULT_AUTHENTICATION_CLASSES": (
-        "base.authentication.KeycloakAuthentication",
-        "base.authentication.CookiesJWTAuthentication",  # Fallback
-    ),
+### 1. **Autenticación con Vault**
+- **AppRole**: Método recomendado para aplicaciones
+- **Token**: Para desarrollo/testing
+- **Rotación**: Tokens deben rotarse periódicamente
+- **Almacenamiento**: Tokens en variables de entorno o secretos
+
+### 2. **Gestión de Claves**
+- **Key Ring**: Una clave por sistema o por relación
+- **Rotación**: Vault maneja rotación automática
+- **Versionado**: Vault mantiene versiones de claves
+- **Backup**: Claves respaldadas en Vault
+
+### 3. **Headers de Seguridad**
+```
+X-Encrypted: true
+X-Encryption-Key: fitflow-django-key
+X-Encryption-Algorithm: aes256-gcm96
+X-Request-ID: <uuid>
+```
+
+### 4. **Validación**
+- Verificar headers antes de descifrar
+- Validar formato de payload cifrado
+- Timeout en operaciones de cifrado
+- Rate limiting en Vault
+
+### 5. **Auditoría**
+- Logging de todas las operaciones de cifrado
+- Métricas de performance
+- Alertas en caso de fallos
+
+---
+
+## ⚙️ Configuración
+
+### Variables de Entorno
+
+```bash
+# Vault Configuration
+VAULT_ADDR=http://localhost:8200
+VAULT_ROLE_ID=<approle-role-id>
+VAULT_SECRET_ID=<approle-secret-id>
+VAULT_TRANSIT_KEY_NAME=fitflow-django-key
+VAULT_TRANSIT_MOUNT_PATH=transit
+
+# Encryption Settings
+ENCRYPT_REQUESTS_TO_DJANGO=true
+ENCRYPT_RESPONSES_FROM_DJANGO=true
+DJANGO_API_BASE_URL=http://django-api:8000
+
+# Performance
+VAULT_REQUEST_TIMEOUT=5
+VAULT_MAX_RETRIES=3
+VAULT_CACHE_TTL=3600
+```
+
+---
+
+## 📊 Métricas y Monitoreo
+
+### Métricas a Monitorear:
+- Tiempo de cifrado/descifrado
+- Tasa de errores
+- Latencia de Vault
+- Uso de claves
+- Requests cifrados/descifrados
+
+### Alertas:
+- Vault no disponible
+- Tiempo de respuesta > threshold
+- Tasa de errores > threshold
+- Autenticación fallida
+
+---
+
+## 🚀 Implementación por Fases
+
+### Fase 1: Infraestructura Base
+- [ ] Configurar Vault con Transit Engine
+- [ ] Crear clave de cifrado
+- [ ] Configurar autenticación AppRole
+- [ ] Cliente Vault básico
+
+### Fase 2: Middleware FastAPI
+- [ ] Middleware de cifrado saliente
+- [ ] Middleware de descifrado entrante
+- [ ] Integración con FastAPI
+- [ ] Manejo de errores
+
+### Fase 3: Testing y Optimización
+- [ ] Tests unitarios
+- [ ] Tests de integración
+- [ ] Optimización de performance
+- [ ] Caché de tokens
+
+### Fase 4: Producción
+- [ ] Configuración de producción
+- [ ] Monitoreo y alertas
+- [ ] Documentación operativa
+- [ ] Plan de rollback
+
+---
+
+## 🔧 Decisiones de Diseño
+
+### 1. **Alcance del Cifrado**
+- ✅ Cifrar solo body JSON
+- ❌ No cifrar headers (excepto metadatos)
+- ❌ No cifrar query parameters
+- ✅ Cifrar tanto requests como responses
+
+### 2. **Formato de Payload Cifrado**
+```json
+{
+  "encrypted_data": "<base64-encoded-ciphertext>",
+  "key_version": 1,
+  "algorithm": "aes256-gcm96"
 }
 ```
 
-### Endpoint del Usuario Autenticado
+### 3. **Manejo de Errores**
+- Si Vault no disponible: Fallar rápido o modo degradado
+- Si descifrado falla: Retornar error 400/500
+- Logging detallado de errores
+- Reintentos con backoff exponencial
 
-**GET** `/api/auth/me/`
-
-Retorna el perfil del usuario actual autenticado con Keycloak o JWT tradicional.
-
----
-
-## 🎨 4. Integración del Frontend (React)
-
-### SDK de Keycloak
-
-Se habilitó autenticación mediante el SDK oficial de Keycloak:
-
-**Instalación:**
-```bash
-npm install keycloak-js
-```
-
-**Configuración:**
-```javascript
-import Keycloak from 'keycloak-js';
-
-const keycloak = new Keycloak({
-  url: 'http://localhost:8081',
-  realm: 'fitFlow',
-  clientId: 'proyectocoremvc-web',
-});
-```
-
-### Login Centralizado
-
-```javascript
-keycloak.login();
-```
-
-Redirige al usuario a Keycloak para autenticarse.
-
-### Logout Global SSO
-
-```javascript
-keycloak.logout();
-```
-
-Cierra la sesión en **todas las aplicaciones** que usen el mismo realm.
-
-### Interceptor Axios
-
-Se añadió un interceptor para enviar el token en cada request:
-
-```javascript
-axios.interceptors.request.use((config) => {
-  if (keycloak.authenticated && keycloak.token) {
-    config.headers.Authorization = `Bearer ${keycloak.token}`;
-  }
-  return config;
-});
-```
+### 4. **Performance**
+- Caché de tokens de autenticación
+- Pool de conexiones HTTP a Vault
+- Timeout configurable
+- Operaciones asíncronas donde sea posible
 
 ---
 
-## 🐳 5. Variables de Entorno Docker
+## 📚 Referencias
 
-### Backend
-
-Para permitir que Django valide tokens desde un Keycloak en el host:
-
-```env
-KEYCLOAK_ISSUER=http://localhost:8081/realms/fitFlow
-KEYCLOAK_CLIENT_ID=proyectocoremvc-web
-KEYCLOAK_JWKS_URL=http://host.docker.internal:8081/realms/fitFlow/protocol/openid-connect/certs
-```
-
-**Nota:** Se usa `host.docker.internal` para acceder a Keycloak que corre en el host desde el contenedor Docker.
-
-### Frontend
-
-```env
-REACT_APP_KEYCLOAK_URL=http://localhost:8081
-REACT_APP_KEYCLOAK_REALM=fitFlow
-REACT_APP_KEYCLOAK_CLIENT_ID=proyectocoremvc-web
-REACT_APP_API_URL=http://localhost:9001
-```
-
----
-
-## 🔄 6. Flujo de Autenticación SSO
-
-### Escenario: Usuario se loguea en ProyectoCoreMVC
-
-```
-1. Usuario → ProyectoCoreMVC (click en "Iniciar Sesión")
-   ↓
-2. ProyectoCoreMVC → Redirige a Keycloak (realm: fitFlow)
-   ↓
-3. Usuario → Ingresa credenciales en Keycloak
-   ↓
-4. Keycloak → Valida y genera token
-   ↓
-5. Keycloak → Redirige a ProyectoCoreMVC con token
-   ↓
-6. ProyectoCoreMVC → Usuario autenticado ✅
-```
-
-### Escenario: Usuario accede al Proyecto Existente
-
-```
-1. Usuario → Proyecto Existente
-   ↓
-2. Proyecto Existente → Verifica sesión en Keycloak (fitFlow)
-   ↓
-3. Keycloak → Sesión válida encontrada
-   ↓
-4. Proyecto Existente → Usuario autenticado automáticamente ✅
-   (NO solicita credenciales - SSO funcionando)
-```
-
-### Escenario: Logout
-
-```
-1. Usuario → Cierra sesión en cualquier proyecto
-   ↓
-2. Keycloak → Invalida sesión del realm fitFlow
-   ↓
-3. Ambos proyectos → Usuario deslogueado ✅
-   (SSO compartido: logout en uno = logout en todos)
-```
-
----
-
-## ✅ Resultado Final
-
-Con esta integración:
-
-- 🔐 **Un solo login** autentica al usuario en ambas aplicaciones
-- 🚪 **Un solo logout** cierra sesión en todas las aplicaciones
-- 👥 **Usuarios compartidos** entre ambas soluciones
-- 🔑 **Tokens válidos** para ambos proyectos desde el mismo realm
-
----
-
-**Última actualización:** Diciembre 2024
-
-
+- [HashiCorp Vault Transit Engine](https://www.vaultproject.io/docs/secrets/transit)
+- [Vault Python Client](https://hvac.readthedocs.io/)
+- [FastAPI Middleware](https://fastapi.tiangolo.com/advanced/middleware/)
 

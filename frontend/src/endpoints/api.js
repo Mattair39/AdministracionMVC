@@ -466,3 +466,31 @@ export const get_project_hours_alert_extended = async (projectId, autoPackageId 
     });
   }
 };
+
+// ═══════════════════════════════════════════════════════════
+// INTEGRACIONES CON FITFLOW
+// ═══════════════════════════════════════════════════════════
+
+const INTEGRATIONS_URL = `${BASE_URL}integrations/`;
+
+/**
+ * Envía datos de un alimento a FitFlow con cifrado Vault
+ */
+export const send_food_to_fitflow = async (foodData) => {
+  try {
+    const { data } = await axios.post(
+      `${INTEGRATIONS_URL}food/send/`,
+      foodData,
+      { withCredentials: true }
+    );
+    return data;
+  } catch (e) {
+    const refreshed = await call_refresh(e, () =>
+      axios.post(`${INTEGRATIONS_URL}food/send/`, foodData, {
+        withCredentials: true
+      })
+    );
+    if (refreshed) return refreshed;
+    throw e;
+  }
+};
